@@ -1,4 +1,30 @@
 <?PHP
+/*- 
+ * Copyright (c) 2017 Artisan du Numérique <etienne@artisan-numerique.ch>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 class JRestClient {
 
    protected $url;
@@ -57,6 +83,7 @@ class JRestClient {
       return $this->_return(curl_exec($this->ch)); 
    }
 
+   /* Add an element */
    function put($data, $id, $collection = NULL) {
       $jdata = json_encode($data);
       $this->_init($this->_build_url(array($id), $collection));
@@ -69,6 +96,7 @@ class JRestClient {
       return $this->exec();
    }
 
+   /* Update an element */
    function post($data, $collection = NULL) {
       $jdata = json_encode($data);
       $this->_init($this->_build_url(NULL, $collection));
@@ -81,18 +109,28 @@ class JRestClient {
       return $this->exec();
    }
 
+   /* Get an element */
    function get($id, $collection = NULL) {
       $this->_init($this->_build_url(array($id), $collection));
       curl_setopt($this->ch, CURLOPT_HTTPGET, TRUE);
       return $this->exec();
    }
 
+   /* Delete an element */
+   function delete($id, $collection = NULL) {
+      $this->_init($this->_build_url(array($id), $collection));
+      curl_setopt($this->ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+      return $this->exec();
+   }
+  
+   /* Get all entry from a collection */ 
    function getCollection($collection = NULL) {
       $this->_init($this->_build_url(NULL, $collection));
       curl_setopt($this->ch, CURLOPT_HTTPGET, TRUE);
       return $this->exec();
    }
 
+   /* Search in a collection, if no search term, return whole collection */
    function search($search = array(), $collection = NULL) {
       if(empty($search)) {
          return $this->getCollection($collection);
