@@ -1,0 +1,12 @@
+artnum/phplibs
+--------------
+
+
+Various resources for PHP project.
+
+Files
+-----
+
+  - id.php -> Generate ID to use as filename, resource ID, ...
+  - JRestClient.php -> cURL based JSON/Rest client
+  - xattr.php -> Extended attribute on linux
