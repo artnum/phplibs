@@ -24,9 +24,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-require('id.php');
-
 Namespace artnum;
+
+require('id.php');
 
 class SQL {
    protected $DB;
@@ -45,7 +45,7 @@ class SQL {
       $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1', 
             $this->Table, $this->IDName);
       $st = $this->DB->prepare($pre_statement);
-      $bind_type = ctype_digit($id) ? PDO::PARAM_INT : PDO::PARAM_STR;
+      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
       $st->bindParam(':id', $id, $bind_type);
       return $st->execute();
    }
@@ -54,10 +54,10 @@ class SQL {
       $pre_statement = sprintf('SELECT * FROM `%s` WHERE %s = :id', 
             $this->Table, $this->IDName);
       $st = $this->DB->prepare($pre_statement);
-      $bind_type = ctype_digit($id) ? PDO::PARAM_INT : PDO::PARAM_STR;
+      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
       $st->bindParam(':id', $id, $bind_type);
       if($st->execute()) {
-         $data = $st->fetch(PDO::FETCH_ASSOC);
+         $data = $st->fetch(\PDO::FETCH_ASSOC);
          if($data != FALSE) {
             return $data;
          }
@@ -65,22 +65,91 @@ class SQL {
       return NULL;
    }
 
+   function prepareSearch($searches) {
+      $op = ''; $no_value = false;
+       foreach($searches as $search) {
+         switch($search[1]) {
+            case '=': $op = ' = '; break;
+            case '~': $op = ' LIKE '; break;
+            case '!': $op = ' <> '; break;
+            case 'x': $op = ' IS NULL'; $no_value = TRUE; break;
+            case '*': $op = ' IS NOT NULL'; $no_value = TRUE; break;
+            case '<=': $op = ' <= '; break;
+            case '>=': $op = ' >= '; break;
+            case '<': $op = ' < '; break;
+            case '>': $op =   ' > '; break;
+         }    
+      }
+  
+      $s = array();
+      if($no_value) {
+         $s[] = $this->Table . '_' . $search[0]  . $op;   
+      } else {
+         $str = $this->Table . '_' . $search[0] . $op;
+         if(is_numeric($search[2])) {
+            $str .= $search[2];
+         } else {
+            $str .= '"' . $search[2] . '"';
+         }
+         $s[] = $str;
+      }
+   
+      if(count($s)>0) {
+         return 'WHERE ' . implode(' AND ', $s);
+      } else {
+         return '';
+      }
+   }
+
+   function prepareLimit($limit) {
+      if(ctype_digit($limit)) {
+         return ' LIMIT ' . $limit;
+      } else {
+         list($offset, $limit) = explode(',', $limit);
+         $offset = trim($offset); $limit = trim($limit);
+         if(ctype_digit($offset) && ctype_digit($limit)) {
+            return ' LIMIT ' . $limit . ' OFFSET ' . $offset;
+         }
+      }
+
+      return '';
+   }
+
+   function prepareSort($sort) {
+      $o = array();
+      foreach($sort as $attr => $dir) {
+         $dir = strtoupper($dir);
+         if($dir == 'ASC' || $dir == 'DESC') {
+            $o[] = $attr . ' ' . $dir;
+         }
+      }
+
+      if( !empty($o)) {
+         return ' ORDER BY ' . implode(', ', $o);
+      }
+
+      return '';
+   }
+
    function listing($options) {
       $pre_statement = sprintf('SELECT `%s` FROM `%s`', 
             $this->IDName, $this->Table);
 
-      if(isset($options['sort'])) {
-         $o = array();
-         foreach($options['sort'] as $sort) {
-            $o[] = $this->Table . '_' . $sort[0] . ' ' . $sort[1];
-         }
-         $order = ' ORDER BY ' . implode(',', $o);
-         $pre_statement .= $order;
+      if(isset($options['search']) && ! empty($options['search'])) {
+         $pre_statement .= ' ' . $this->prepareSearch($options['search']);
       }
-      
+
+      if(isset($options['sort']) && ! empty($options['sort'])) {
+         $pre_statement .= ' ' . $this->prepareSort($options['sort']);
+      }
+     
+      if(isset($options['limit']) && ! empty($options['limit'])) { 
+         $pre_statement .= ' ' . $this->prepareLimit($options['limit']);
+      }
+
       $st = $this->DB->prepare($pre_statement);
       if($st->execute()) {
-         $data = $st->fetchAll(PDO::FETCH_ASSOC);
+         $data = $st->fetchAll(\PDO::FETCH_ASSOC);
          $return = array();
          foreach($data as $d) {
             $return[] = $this->read($d[$this->IDName])[0];
@@ -104,10 +173,10 @@ class SQL {
    }
 
    function exists($id) {
-      $pre_statement = sprintf('SELECT `%` FROM `%s` WHERE %s = :id',
+      $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE %s = :id',
             $this->IDName, $this->Table, $this->IDName);
       $st = $this->DB->prepare($pre_statement);
-      $bind_type = ctype_digit($id) ? PDO::PARAM_INT : PDO::PARAM_STR;
+      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
       $st->bindParam(':id', $id, $bind_type);
       if($st->execute()) {
          if($st->rowCount()==1) {
@@ -121,7 +190,7 @@ class SQL {
       $columns = array();
       $values = array();
 
-      if(!isset($data[$this->IDName])) {
+      if(!isset($data[$this->IDName]) || empty($data[$this->IDName])) {
          $data[$this->IDName] = $this->uid($data);
       }
 
@@ -135,17 +204,17 @@ class SQL {
             $this->Table, $columns_txt, $values_txt);
       $st = $this->DB->prepare($pre_statement);
       foreach($data as $k_data => &$v_data) {
-         $bind_type = PDO::PARAM_STR;
-         if(is_null($v_data)) { $bind_type = PDO::PARAM_NULL; }
-         else if(ctype_digit($v_data)) { $bind_type = PDO::PARAM_INT; }
-         else if(is_bool($v_data)) { $bind_type = PDO::PARAM_BOOL; }
+         $bind_type = \PDO::PARAM_STR;
+         if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
+         else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
+         else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
 
          $st->bindParam(':' . $k_data, $v_data, $bind_type);
       }
       if(! $st->execute()) {
          return FALSE;
       }
-      return TRUE;
+      return $data[$this->IDName];
    }
    
    function update($data) {
@@ -168,16 +237,33 @@ class SQL {
             $this->Table, $columns_values_txt, $this->IDName, $this->IDName);
       $st = $this->DB->prepare($pre_statement);
       foreach($data as $k_data => &$v_data) {
-         $bind_type = PDO::PARAM_STR;
-         if(is_null($v_data)) { $bind_type = PDO::PARAM_NULL; }
-         else if(ctype_digit($v_data)) { $bind_type = PDO::PARAM_INT; }
-         else if(is_bool($v_data)) { $bind_type = PDO::PARAM_BOOL; }
+         $bind_type = \PDO::PARAM_STR;
+         if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
+         else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
+         else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
 
          $st->bindParam(':' . $k_data, $v_data, $bind_type);
       }
-      $bind_type = ctype_digit($data[$this->IDName]) ? PDO::PARAM_INT : PDO::PARAM_STR;
+      $bind_type = ctype_digit($data[$this->IDName]) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
       $st->bindParam(':id', $data[$this->IDName], $bind_type);
-      return $st->execute();
+      if(! $st->execute()) {
+         return FALSE;
+      }
+      return $data[$this->IDName];
+   }
+
+   function write($data) {
+      $prefixed = array();
+      
+      foreach($data as $k => $v) {
+         $prefixed[$this->Table . '_' . $k] = $v;
+      }
+
+      if(!isset($prefixed) || empty($prefixed[$this->IDName])) {
+         return $this->create($prefixed);
+      } else {
+         return $this->update($prefixed);
+      }
    }
 
    function uid($data) {
