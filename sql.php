@@ -66,6 +66,7 @@ class SQL {
    }
 
    function prepareSearch($searches) {
+      $s = array();
       $op = ''; $no_value = false;
        foreach($searches as $search) {
          switch($search[1]) {
@@ -79,28 +80,26 @@ class SQL {
             case '<': $op = ' < '; break;
             case '>': $op =   ' > '; break;
          }    
-      }
   
-      $s = array();
-      if($no_value) {
-         $s[] = $this->Table . '_' . $search[0]  . $op;   
-      } else {
-         $str = $this->Table . '_' . $search[0] . $op;
-         if(is_numeric($search[2])) {
-            $str .= $search[2];
+         if($no_value) {
+            $s[] = $this->Table . '_' . $search[0]  . $op;   
          } else {
-            $str .= '"' . $search[2] . '"';
+            $str = $this->Table . '_' . $search[0] . $op;
+            if(is_numeric($search[2])) {
+               $str .= $search[2];
+            } else {
+               $str .= '"' . $search[2] . '"';
+            }
+            $s[] = $str;
          }
-         $s[] = $str;
       }
-   
+      
       if(count($s)>0) {
          return 'WHERE ' . implode(' AND ', $s);
       } else {
          return '';
       }
    }
-
    function prepareLimit($limit) {
       if(ctype_digit($limit)) {
          return ' LIMIT ' . $limit;
@@ -199,7 +198,7 @@ class SQL {
       }
       $columns_txt = implode(',', $columns);
       $values_txt = implode(',', $values);
-      
+
       $pre_statement = sprintf('INSERT INTO `%s` ( %s ) VALUES ( %s )',
             $this->Table, $columns_txt, $values_txt);
       $st = $this->DB->prepare($pre_statement);
