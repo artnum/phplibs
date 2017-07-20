@@ -27,23 +27,21 @@
 spl_autoload_register(function($class_name) {
    $ns = explode('\\', $class_name);
    if(count($ns) > 1) {
-      $class_name = $ns[count($ns) - 1];
+      $class_name = implode(\DIRECTORY_SEPARATOR, $ns);
    }
 
-   foreach(array('./Controllers/', './Models/', './Views/') as $p) {
-      if(is_readable($p . '/' . $class_name . '.php')) {
-         include($p . '/' . $class_name . '.php');
+   foreach(array('Controllers', 'Models', 'Views') as $p) {
+      $path = implode(DIRECTORY_SEPARATOR, array('.', $p, $class_name));
+      if(is_readable($path. '.php')) {
+         include($path . '.php');
          return;
       }
    }
 
    foreach(explode(PATH_SEPARATOR, get_include_path()) as $p) {
-      if(is_readable($p . '/' . $class_name . '.php')) {
-         include($p . '/' . $class_name . '.php');
-         return;
-      }
-      if(is_readable($p . '/artnum/' . $class_name . '.php')) {
-         include($p . '/artnum/' . $class_name . '.php');
+      $path = implode(DIRECTORY_SEPARATOR, array($p, $class_name));
+      if(is_readable($path . '.php')) {
+         include($path . '.php');
          return;
       }
    }
