@@ -24,16 +24,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-Namespace artnum;
+Namespace artnum\JStore;
 
-class JBaseStore {
+class Base {
    public $db;
    public $request;
 
    function __construct($http_request = NULL, $dont_run = false) {
       if(is_null($http_request)) {
          try {
-            $this->request = new HTTPJsonRequest();
+            $this->request = new \artnum\HTTP\JsonRequest();
          } catch(Exception $e) {
             $this->fail($e->getMessage());
          }
@@ -75,7 +75,7 @@ class JBaseStore {
    }
 
    function fail($message) {
-      HTTPResponse::code(500); 
+      \artnum\HTTP\Response::code(500); 
       file_put_contents('php://output', '{ type: "error", message: "' . $message . '"}');
       exit(-1); 
    }

@@ -24,9 +24,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-Namespace artnum;
+Namespace artnum\JStore;
 
-class JPDOStore extends JBaseStore {
+class PDO extends Base {
    function __construct($pdo_string = '', $http_request = NULL,  $dont_run = false) {
       if(empty($pdo_string)) {
          $pdo_string = getenv('JSTORE_PDO_STRING');

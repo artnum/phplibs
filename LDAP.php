@@ -26,7 +26,7 @@
  */
 Namespace artnum;
 
-class LDAP extends LDAPConns {
+class LDAP extends LDAP\Conns {
 
    function __construct() {
       parent::__construct();

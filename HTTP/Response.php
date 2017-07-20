@@ -24,9 +24,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-Namespace artnum;
+Namespace artnum\HTTP;
 
-class HTTPResponse {
+class Response {
    static $http_code = array(
          100 => 'Continue',
          101 => 'Switching Protocols',

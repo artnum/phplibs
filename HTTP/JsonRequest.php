@@ -24,9 +24,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-Namespace artnum;
+Namespace artnum\HTTP;
 
-class HTTPJsonRequest
+class JsonRequest
 {
    public $url_elements;
    public $parameters;

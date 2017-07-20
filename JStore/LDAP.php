@@ -24,15 +24,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-Namespace artnum;
+Namespace artnum\JStore;
 
-class JLDAPStore extends JBaseStore {
+class LDAP extends Base {
    function __construct($ldap_uris = array(), $http_request = NULL, $dont_run = false) { 
       if(empty($ldap_uris)) {
          $this->fail('Configuration error');
       }
 
-      $this->db = new LDAP();
+      $this->db = new \artnum\LDAP();
       foreach($ldap_uris as $ldap_uri) {
          $ro = isset($ldap_uri['ro']) ? $ldap_uri['ro'] : false;
          $this->db->connect($ldap_uri['uri'], $ro);
