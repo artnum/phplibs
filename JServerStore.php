@@ -45,7 +45,7 @@ class JServerStore {
       }
 
       try {
-         $this->request = new \HTTPJsonRestRequest();
+         $this->request = new HTTPJsonRequest();
       } catch(Exception $e) {
          $this->fail($e->getMessage());
       }
