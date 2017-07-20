@@ -27,8 +27,24 @@
 Namespace artnum;
 
 class JBaseStore {
-   protected $db;
-   protected $request;
+   public $db;
+   public $request;
+
+   function __construct($http_request = NULL, $dont_run = false) {
+      if(is_null($http_request)) {
+         try {
+            $this->request = new HTTPJsonRequest();
+         } catch(Exception $e) {
+            $this->fail($e->getMessage());
+         }
+      } else {
+         $this->request = $http_request;
+      }
+
+      if( ! $dont_run) {
+         $this->run();
+      }
+   }
 
    function run() {
       if(ctype_alpha($this->request->getCollection())) {
