@@ -41,19 +41,7 @@ class JPDOStore extends JBaseStore {
          $this->fail($e->getMessage());
       }
 
-      if(is_null($http_request)) {
-         try {
-            $this->request = new HTTPJsonRequest();
-         } catch(Exception $e) {
-            $this->fail($e->getMessage());
-         }
-      } else {
-         $this->request = $http_request;
-      }
-
-      if( ! $dont_run) {
-         $this->run();
-      }
+      parent::__construct($http_request, $dont_run);
    }
 }
 ?>
