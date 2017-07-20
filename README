@@ -7,7 +7,10 @@ Various resources for PHP project.
 Files
 -----
 
+  - autoload.php -> a SPL loader
   - id.php -> Generate ID to use as filename, resource ID, ...
   - JRestClient.php -> cURL based JSON/Rest client
   - xattr.php -> Extended attribute on linux
-  - sql.php -> PDO utility class
+  - SQL.php -> PDO utility class
+  - JServerStore.php -> a json rest store, server side
+  - HTTPJsonRequest.php -> parse a json http request
