@@ -26,11 +26,8 @@
  */
 Namespace artnum;
 
-class JServerStore {
-   private $pdo;
-   private $request;
-
-   function __construct($pdo_string = '', $dont_run = false) {
+class JPDOStore extends JBaseStore {
+   function __construct($pdo_string = '', $http_request = NULL,  $dont_run = false) {
       if(empty($pdo_string)) {
          $pdo_string = getenv('JSTORE_PDO_STRING');
       } 
@@ -39,54 +36,24 @@ class JServerStore {
       }
 
       try {
-         $this->pdo = new \PDO($pdo_string);
+         $this->db = new \PDO($pdo_string);
       } catch(PDOException $e) {
          $this->fail($e->getMessage());
       }
 
-      try {
-         $this->request = new HTTPJsonRequest();
-      } catch(Exception $e) {
-         $this->fail($e->getMessage());
+      if(is_null($http_request)) {
+         try {
+            $this->request = new HTTPJsonRequest();
+         } catch(Exception $e) {
+            $this->fail($e->getMessage());
+         }
+      } else {
+         $this->request = $http_request;
       }
 
       if( ! $dont_run) {
          $this->run();
       }
-   }
-
-   function run() {
-      if(ctype_alpha($this->request->getCollection())) {
-         try {
-            $model = '\\' . $this->request->getCollection() . 'Model';
-            $model = new $model($this->pdo, NULL);
-
-            $controller = '\\' . $this->request->getCollection() . 'Controller';
-            $controller = new $controller($model, NULL);
-
-            $view = '\\' . $this->request->getCollection() . 'View';
-            $view = new $view($model, NULL);
-         } catch(Exception $e) {
-            $this->fail($e->getMessage());
-         }
-      
-         try {
-            $action = strtolower($this->request->getVerb()) . 'Action';
-            $view->$action(
-                  $controller->$action($this->request)
-            );
-         } catch(Exception $e) {
-            $this->fail($e->getMessage());
-         }
-      } else {
-         $this->fail('Collection not valid');
-      }
-   }
-
-   function fail($message) {
-      http_response_code(500);
-      file_put_contents('php://output', '{ type: "error", message: "' . $message . '"}');
-      exit(-1); 
    }
 }
 ?>
