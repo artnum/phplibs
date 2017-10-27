@@ -41,6 +41,19 @@ class SQL {
       $this->Config = $config;
    } 
 
+   function conf($name, $value = null) {
+      if(is_null($value)) {
+         if(isset($this->Config[$name])) {
+            return $this->Config[$name];
+         }
+      } else {
+         $this->Config[$name] = $value;
+         return $this->Config[$name];
+      }
+
+      return null;
+   }
+
    function delete($id) {
       $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1', 
             $this->Table, $this->IDName);
@@ -66,36 +79,59 @@ class SQL {
    }
 
    function prepareSearch($searches) {
-      $s = array();
       $op = ''; $no_value = false;
-       foreach($searches as $search) {
-         switch($search[1]) {
+      foreach($searches as $name => $search) {
+         if($name == '_rules') { continue; }
+         $value = substr($search, 1);
+         switch($search[0]) {
+            default:
+               $value = $search;
             case '=': $op = ' = '; break;
             case '~': $op = ' LIKE '; break;
             case '!': $op = ' <> '; break;
-            case 'x': $op = ' IS NULL'; $no_value = TRUE; break;
+            case '-': $op = ' IS NULL'; $no_value = TRUE; break;
             case '*': $op = ' IS NOT NULL'; $no_value = TRUE; break;
-            case '<=': $op = ' <= '; break;
-            case '>=': $op = ' >= '; break;
-            case '<': $op = ' < '; break;
-            case '>': $op =   ' > '; break;
+            case '<':
+                  if($search[1] == '=') {
+                     $value = substr($value, 1);
+                     $op = ' <= ';
+                  } else {
+                     $op = ' < ';
+                  }
+                  break;
+            case '>': 
+                  if($search[1] == '=') {
+                     $value = substr($value, 1);
+                     $op = ' >= ';
+                  } else {
+                     $op = ' > ';
+                  }
+                  break;
          }    
-  
+         $value = trim($value); 
          if($no_value) {
-            $s[] = $this->Table . '_' . $search[0]  . $op;   
+            $s[$name] = $this->Table . '_' . $name  . $op;   
          } else {
-            $str = $this->Table . '_' . $search[0] . $op;
-            if(is_numeric($search[2])) {
-               $str .= $search[2];
+            $str = $this->Table . '_' . $name . $op;
+            if(is_numeric($value)) {
+               $str .= $value;
             } else {
-               $str .= '"' . $search[2] . '"';
+               $str .= '"' . $value . '"';
             }
-            $s[] = $str;
+            $s[$name] = $str;
          }
       }
       
       if(count($s)>0) {
-         return 'WHERE ' . implode(' AND ', $s);
+         if(! isset($searches['_rules'])) {
+            return 'WHERE ' . implode(' AND ', $s);
+         } else {
+            $exp =  'WHERE ' . $searches['_rules'];
+            foreach($s as $k => $v) {
+               $exp = str_replace($k, $v, $exp);
+            }
+            return $exp;
+         }
       } else {
          return '';
       }
@@ -145,7 +181,7 @@ class SQL {
       if(isset($options['limit']) && ! empty($options['limit'])) { 
          $pre_statement .= ' ' . $this->prepareLimit($options['limit']);
       }
-
+      
       $st = $this->DB->prepare($pre_statement);
       if($st->execute()) {
          $data = $st->fetchAll(\PDO::FETCH_ASSOC);
@@ -189,8 +225,10 @@ class SQL {
       $columns = array();
       $values = array();
 
-      if(!isset($data[$this->IDName]) || empty($data[$this->IDName])) {
-         $data[$this->IDName] = $this->uid($data);
+      if(! $this->conf('auto-increment')) {
+         if(!isset($data[$this->IDName]) || empty($data[$this->IDName])) {
+            $data[$this->IDName] = $this->uid($data);
+         }
       }
 
       foreach(array_keys($data) as $c) { 
@@ -210,10 +248,22 @@ class SQL {
 
          $st->bindParam(':' . $k_data, $v_data, $bind_type);
       }
-      if(! $st->execute()) {
-         return FALSE;
+      if($this->conf('auto-increment')) {
+         $this->DB->beginTransaction();
       }
-      return $data[$this->IDName];
+
+      if(! $st->execute()) {
+         throw new \Exception('DB Write failed');
+      }
+     
+
+      if($this->conf('auto-increment')) {
+         $idx = $this->DB->lastInsertId();
+         $this->DB->commit();
+         return $idx;
+      } else {
+         return $data[$this->IDName];
+      }
    }
    
    function update($data) {
@@ -257,7 +307,6 @@ class SQL {
       foreach($data as $k => $v) {
          $prefixed[$this->Table . '_' . $k] = $v;
       }
-
       if(!isset($prefixed) || empty($prefixed[$this->IDName])) {
          return $this->create($prefixed);
       } else {
