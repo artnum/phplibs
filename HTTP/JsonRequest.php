@@ -124,14 +124,29 @@ class JsonRequest
          /* also deal with php array */
          $name = str_replace(array('[', ']'), '', $name);
 
-         if( isset($arr[$name]) ) { 
-            if( is_array($arr[$name]) ) { 
-               $arr[$name][] = $value; 
+         $group = '';
+         if(strstr($name, '.')) {
+            list ($group, $name) = explode('.', $name, 2);
+         }
+
+         $ref =& $arr;
+         if(!empty($group)) {
+         
+            if(!isset($arr[$group])) { 
+               $arr[$group] = array();
+            }
+
+            $ref =& $arr[$group];
+         }
+
+         if( isset($ref[$name]) ) { 
+            if( is_array($ref[$name]) ) { 
+               $ref[$name][] = $value; 
             } else { 
-               $arr[$name] = array($arr[$name], $value); 
+               $ref[$name] = array($ref[$name], $value); 
             } 
          } else { 
-            $arr[$name] = $value; 
+            $ref[$name] = $value; 
          } 
       }
 
@@ -148,14 +163,28 @@ class JsonRequest
       
       $content = file_get_contents('php://input');
       if($content != FALSE) {
-         $json_root = json_decode($content, true);
-         if($json_root) {
-            foreach($json_root as $_k => $_v) {
-               $params[$_k] = $_v;
-            }         
+         if(strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
+            foreach($this->_parse_str($content) as $_k => $_v) {
+               if(!empty($params[$_k])) {
+                  if(is_array($params[$_k])) {
+                     $params[$_k][] = $_v;
+                  } else {
+                     $params[$_k] = array($params[$_k], $_v);
+                  }
+               } else {
+                  $params[$_k] = $_v;
+               }
+            }
+         }  else {
+            $json_root = json_decode($content, true);
+            if($json_root) {
+               foreach($json_root as $_k => $_v) {
+                     $params[$_k] = $_v;
+               }         
+            }
          }
       }
-   
+      
       $this->parameters = $params;
    }
 }
