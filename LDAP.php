@@ -26,10 +26,135 @@
  */
 Namespace artnum;
 
-class LDAP extends LDAP\Conns {
+class LDAP  {
 
-   function __construct() {
-      parent::__construct();
+   protected $DB;
+   protected $Suffix; 
+   protected $IDName;
+   protected $Config;
+
+   function __construct($servers, $suffix, $id_name, $config) {
+      $this->DB = new LDAPDB($servers);
+      $this->Suffix = $suffix;
+      $this->IDName = $id_name;
+      $this->Config = $config;
+   }
+
+   function get($dn) {
+      $c = $this->DB->readable();
+      $res = ldap_read($c, $dn, '(objectclass=*)');
+      if($res && ldap_count_entries($c, $res) == 1) {
+         $data = ldap_get_entries($c, $res);
+         if($data['count'] == 1) {
+            return $data[0];
+         }
+      }
+      return NULL;
+   }
+
+   function read($dn) {
+      $entry = $this->get($dn);
+      if($entry) {
+         $e = array();
+         foreach($entry as $k => $v) {
+            if($entry[$k]['count'] > 1) {
+
+               $_k = explode(';', $k);
+               if(count($_k) > 1) {
+                  $k = $_k[0];
+               }
+
+               $e[$k] = array();
+               for($i = 0; $i < $entry[$k]['count']; $i++) {
+                  $e[$k][] = $entry[$k][$i];
+               }
+            } else {
+               $e[$k] = $entry[$k][0];
+            }
+         }  
+         return array($e);
+      }
+      return array();
+   }
+
+   function delete($dn) {
+      $c = $this->DB->writable();
+      if($this->exists($dn)) {
+         return ldap_delete($c, $dn);
+      } 
+   }
+
+   function exists($dn) {
+      $c = $this->DB->readable();
+      $res = ldap_read($c, $dn, '(objectclass=*)', array('dn'));
+      if($res && ldap_count_entries($c, $res) == 1) {
+         return TRUE;
+      }
+      return FALSE;
+   }
+
+   function prepareSearch($searches) {
+      $op = ''; $no_value = false;
+      foreach($searches as $name => $search) {
+         if($name == '_rules') { continue; }
+         $value = substr($search, 1);
+         switch($search[0]) {
+            default:
+               $value = $search;
+            case '=': $op = ' = '; break;
+            case '~': $op = ' LIKE '; break;
+            case '!': $op = ' <> '; break;
+            case '-': $op = ' IS NULL'; $no_value = TRUE; break;
+            case '*': $op = ' IS NOT NULL'; $no_value = TRUE; break;
+            case '<':
+                  if($search[1] == '=') {
+                     $value = substr($value, 1);
+                     $op = ' <= ';
+                  } else {
+                     $op = ' < ';
+                  }
+                  break;
+            case '>': 
+                  if($search[1] == '=') {
+                     $value = substr($value, 1);
+                     $op = ' >= ';
+                  } else {
+                     $op = ' > ';
+                  }
+                  break;
+         }    
+         $value = trim($value); 
+         if($no_value) {
+            $s[$name] = $this->Table . '_' . $name  . $op;   
+         } else {
+            $str = $this->Table . '_' . $name . $op;
+            if(is_numeric($value)) {
+               $str .= $value;
+            } else {
+               $str .= '"' . $value . '"';
+            }
+            $s[$name] = $str;
+         }
+      }
+      
+      if(count($s)>0) {
+         if(! isset($searches['_rules'])) {
+            return 'WHERE ' . implode(' AND ', $s);
+         } else {
+            $exp =  'WHERE ' . $searches['_rules'];
+            foreach($s as $k => $v) {
+               $exp = str_replace($k, $v, $exp);
+            }
+            return $exp;
+         }
+      } else {
+         return '';
+      }
+   }
+
+   function listing($options) {
+      $c = $this->DB->readable();
+      $res = ldap_search($c, '', );
    }
 }
 ?>
