@@ -41,6 +41,10 @@ class SQL {
       $this->Config = $config;
    } 
 
+   private function dbtype() {
+      return 'pdo';
+   }
+
    function conf($name, $value = null) {
       if(is_null($value)) {
          if(isset($this->Config[$name])) {
