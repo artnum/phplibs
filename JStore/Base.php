@@ -26,6 +26,8 @@
  */
 Namespace artnum\JStore;
 
+set_exception_handler('\\artnum\\JStore\\Base::fail');
+
 class Base {
    public $db;
    public $request;
@@ -63,9 +65,12 @@ class Base {
       
          try {
             $action = strtolower($this->request->getVerb()) . 'Action';
-            $view->$action(
-                  $controller->$action($this->request)
-            );
+            $results = $controller->$action($this->request);
+            if(! $results) {
+               $results = array(); 
+            }
+            file_put_contents('php://output',
+                  json_encode(array('type' => 'results', 'data' => $results)));
          } catch(Exception $e) {
             $this->fail($e->getMessage());
          }
@@ -75,6 +80,9 @@ class Base {
    }
 
    function fail($message) {
+      if(!is_string($message)) {
+         $message = $message->getMessage();
+      }
       \artnum\HTTP\Response::code(500); 
       file_put_contents('php://output', '{ type: "error", message: "' . $message . '"}');
       exit(-1); 
