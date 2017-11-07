@@ -26,8 +26,6 @@
  */
 Namespace artnum\JStore;
 
-set_exception_handler('\\artnum\\JStore\\Base::fail');
-
 class Base {
    public $db;
    public $request;
@@ -48,21 +46,11 @@ class Base {
       }
    }
 
-   function get_db() {
-      return $this->db;
-   }
-
-   function _db($m) {
-      return $this->db;
-   }
-
    function run() {
       if(ctype_alpha($this->request->getCollection())) {
          try {
             $model = '\\' . $this->request->getCollection() . 'Model';
-            $model = new $model(NULL, NULL);
-            $model->set_db($this->_db($model));
-
+            $model = new $model($this->db, NULL);
 
             $controller = '\\' . $this->request->getCollection() . 'Controller';
             $controller = new $controller($model, NULL);
@@ -75,12 +63,9 @@ class Base {
       
          try {
             $action = strtolower($this->request->getVerb()) . 'Action';
-            $results = $controller->$action($this->request);
-            if(! $results) {
-               $results = array(); 
-            }
-            file_put_contents('php://output',
-                  json_encode(array('type' => 'results', 'data' => $results)));
+            $view->$action(
+                  $controller->$action($this->request)
+            );
          } catch(Exception $e) {
             $this->fail($e->getMessage());
          }
@@ -90,9 +75,6 @@ class Base {
    }
 
    function fail($message) {
-      if(!is_string($message)) {
-         $message = $message->getMessage();
-      }
       \artnum\HTTP\Response::code(500); 
       file_put_contents('php://output', '{ type: "error", message: "' . $message . '"}');
       exit(-1); 
