@@ -40,9 +40,13 @@ class SQL {
       $this->IDName = $id_name;
       $this->Config = $config;
    } 
+   
+   function set_db($db) {
+      $this->DB = $db;
+   }
 
-   private function dbtype() {
-      return 'pdo';
+   function dbtype() {
+      return 'sql';
    }
 
    function conf($name, $value = null) {
@@ -61,7 +65,7 @@ class SQL {
    function delete($id) {
       $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1', 
             $this->Table, $this->IDName);
-      $st = $this->DB->prepare($pre_statement);
+      $st = $this->db->prepare($pre_statement);
       $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
       $st->bindParam(':id', $id, $bind_type);
       return $st->execute();
@@ -275,6 +279,7 @@ class SQL {
       $values = array();
 
 
+      $id = $data[$this->IDName];
       if(isset($data[$this->IDName])) {
          unset($data[$this->IDName]);
       }
@@ -297,12 +302,13 @@ class SQL {
 
          $st->bindParam(':' . $k_data, $v_data, $bind_type);
       }
-      $bind_type = ctype_digit($data[$this->IDName]) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-      $st->bindParam(':id', $data[$this->IDName], $bind_type);
-      if(! $st->execute()) {
+      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+      $st->bindParam(':' . $this->IDName, $id, $bind_type);
+      $ex = $st->execute();
+      if(! $ex) {
          return FALSE;
       }
-      return $data[$this->IDName];
+      return $id;
    }
 
    function write($data) {
@@ -311,7 +317,7 @@ class SQL {
       foreach($data as $k => $v) {
          $prefixed[$this->Table . '_' . $k] = $v;
       }
-      if(!isset($prefixed) || empty($prefixed[$this->IDName])) {
+      if(!isset($prefixed[$this->IDName]) || empty($prefixed[$this->IDName])) {
          return $this->create($prefixed);
       } else {
          return $this->update($prefixed);

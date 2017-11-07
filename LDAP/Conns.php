@@ -70,7 +70,9 @@ class Conns {
       $resources = $this->_get_by_naming_context($base);
       if(!empty($resources)) {
          foreach($resources as $r) {
-            if($r['ro'] == $ro) {
+            if(!$ro && !$r['ro']) {
+               return $r['conn'];
+            } else if($ro) {
                return $r['conn'];
             }
          }
@@ -99,6 +101,37 @@ class Conns {
    function none() {
       if(empty($this->conns['ro']) && empty($this->conns['rw'])) { return TRUE; }
       return FALSE;
+   }
+
+   private function _opt_to_args($options) {
+      $args = array('subtree' => true, 'attrs' => array('*'), 'attrsonly' => 0, 'sizelimit' => 0, 'timelimit' => 0, 'deref' => \LDAP_DEREF_NEVER);
+      
+      if(!$options || empty($options)) { return $args; }
+
+      foreach($options as $k => $v) {
+         $args[$k] = $v;
+      }
+
+      return $args
+   }
+
+   function search($dn, $filter = '(objectclass=*)', $options = array()) {
+      $args = $this->_opt_to_args($options);
+      $func = $args['subtree'] ? 'ldap_search' : 'ldap_list';
+      $conn = $this->conn($dn, true);
+
+      if(is_null($conn)) { return FALSE; } 
+
+      $res = $func($conn, $dn, $filter, $args['attrs'], $args['attrsonly'], $args['sizelimit'], $args['timelimit'], $args['deref']);
+      if($res) {
+         for($entry = ldap_first_entry($conn, $res); $entry; $entry = ldap_next_entry($conn, $entry)) {
+            new \artnum\LDAP\Entry($entry, $conn, $this);
+         }          
+      }
+   }
+
+   function read($dn, $options) {
+   
    }
 }
 ?>

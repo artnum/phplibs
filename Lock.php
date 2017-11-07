@@ -71,7 +71,7 @@ class Lock {
       }
       
       $this->DB->exec('BEGIN IMMEDIATE TRANSACTION');
-      $stmt = $this->DB->prepare('INSERT OR REPLACE INTO `locks` (`locks_id`, `locks_state`, locks_timestamp`) VALUES ( :id, 0, 0)');
+      $stmt = $this->DB->prepare('INSERT OR REPLACE INTO `locks` (`locks_id`, `locks_state`, `locks_timestamp`) VALUES ( :id, 0, 0)');
       $stmt->bindValue(':id', strval($id), \SQLITE3_TEXT);
       $stmt->execute();
       $this->DB->exec('COMMIT');

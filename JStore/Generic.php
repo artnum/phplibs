@@ -26,13 +26,13 @@
  */
 Namespace artnum\JStore;
 
-set_exception_handler('\\artnum\\JStore\\Base::fail');
-
-class Base {
+class Generic { 
    public $db;
    public $request;
+   protected $dbs;
 
    function __construct($http_request = NULL, $dont_run = false) {
+      $this->dbs = array();
       if(is_null($http_request)) {
          try {
             $this->request = new \artnum\HTTP\JsonRequest();
@@ -48,13 +48,27 @@ class Base {
       }
    }
 
-   function get_db() {
-      return $this->db;
+   function add_db($type, $db) {
+      if(!isset($this->dbs[$type])) {
+         $this->dbs[$type] = array();
+      }
+
+      $this->dbs[$type][] = $db;
    }
 
    function _db($m) {
-      return $this->db;
+      $type = $m->dbtype();
+      if(isset($this->dbs[$type])) {
+         if(count($this->dbs[$type]) == 1) {
+            return $this->dbs[$type][0];
+         } else {
+            return $this->dbs[$type][rand(0, count($this->dbs[$type]) - 1)];
+         }
+      }
+
+      return NULL;
    }
+
 
    function run() {
       if(ctype_alpha($this->request->getCollection())) {
@@ -66,9 +80,6 @@ class Base {
 
             $controller = '\\' . $this->request->getCollection() . 'Controller';
             $controller = new $controller($model, NULL);
-
-            $view = '\\' . $this->request->getCollection() . 'View';
-            $view = new $view($model, NULL);
          } catch(Exception $e) {
             $this->fail($e->getMessage());
          }
@@ -97,5 +108,7 @@ class Base {
       file_put_contents('php://output', '{ type: "error", message: "' . $message . '"}');
       exit(-1); 
    }
+
+
 }
 ?>

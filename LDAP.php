@@ -30,49 +30,63 @@ class LDAP  {
 
    protected $DB;
    protected $Suffix; 
-   protected $IDName;
    protected $Config;
+   protected $Attribute;
 
-   function __construct($servers, $suffix, $id_name, $config) {
-      $this->DB = new LDAPDB($servers);
+   function __construct($db, $suffix, $attributes, $config) {
+      $this->DB = $db;
       $this->Suffix = $suffix;
-      $this->IDName = $id_name;
+      $this->Attribute = $attributes;
       $this->Config = $config;
+   }
+
+   function dbtype() {
+      return 'ldap';
+   }
+
+   function set_db($db) {
+      $this->DB = $db;
+   }
+
+   function _dn($dn = NULL) {
+      if(!is_null($this->Suffix)) {
+         if(empty($dn) || is_null($dn)) {
+            return $this->Suffix;
+         }
+         return $dn . ',' . $this->Suffix;      
+      }
+
+      return $dn;
    }
 
    function get($dn) {
       $c = $this->DB->readable();
-      $res = ldap_read($c, $dn, '(objectclass=*)');
+      $res = ldap_read($c, $this->_dn($dn), '(objectclass=*)', $this->Attribute);
       if($res && ldap_count_entries($c, $res) == 1) {
-         $data = ldap_get_entries($c, $res);
-         if($data['count'] == 1) {
-            return $data[0];
-         }
+         return ldap_first_entry($c, $res);
       }
       return NULL;
    }
 
    function read($dn) {
+      $c = $this->DB->readable();
       $entry = $this->get($dn);
       if($entry) {
-         $e = array();
-         foreach($entry as $k => $v) {
-            if($entry[$k]['count'] > 1) {
-
-               $_k = explode(';', $k);
-               if(count($_k) > 1) {
-                  $k = $_k[0];
+         $dn = ldap_get_dn($c, $entry);
+         $dn = ldap_explode_dn($dn, 0);
+         $ret = array('IDent' => $dn[0]);
+         foreach($this->Attribute as $attr) {
+            $value = ldap_get_values($c, $entry, $attr);
+            if($value) {
+               if($value['count'] == 1) {
+                  $value = $value[0];
+               } else {
+                  unset($value['count']);
                }
-
-               $e[$k] = array();
-               for($i = 0; $i < $entry[$k]['count']; $i++) {
-                  $e[$k][] = $entry[$k][$i];
-               }
-            } else {
-               $e[$k] = $entry[$k][0];
+               $ret[$attr] = $value;
             }
-         }  
-         return array($e);
+         }
+         return array($ret);
       }
       return array();
    }
@@ -80,13 +94,13 @@ class LDAP  {
    function delete($dn) {
       $c = $this->DB->writable();
       if($this->exists($dn)) {
-         return ldap_delete($c, $dn);
+         return ldap_delete($c, $this->_dn($dn));
       } 
    }
 
    function exists($dn) {
       $c = $this->DB->readable();
-      $res = ldap_read($c, $dn, '(objectclass=*)', array('dn'));
+      $res = ldap_read($c, $this->_dn($dn), '(objectclass=*)', array('dn'));
       if($res && ldap_count_entries($c, $res) == 1) {
          return TRUE;
       }
@@ -94,67 +108,61 @@ class LDAP  {
    }
 
    function prepareSearch($searches) {
-      $op = ''; $no_value = false;
+      $op = ''; $s = 0; $filter='';
       foreach($searches as $name => $search) {
          if($name == '_rules') { continue; }
          $value = substr($search, 1);
          switch($search[0]) {
             default:
                $value = $search;
-            case '=': $op = ' = '; break;
-            case '~': $op = ' LIKE '; break;
-            case '!': $op = ' <> '; break;
-            case '-': $op = ' IS NULL'; $no_value = TRUE; break;
-            case '*': $op = ' IS NOT NULL'; $no_value = TRUE; break;
+            case '=': $op = $name . '=' . trim($value); break;
+            case '~': $op = $name . '~=' . trim($value); break;
+            case '!': $op = '!(' . $name . '=' . trim($value) . ')'; break;
+            case '-': $op = '!(' . $name . '=*)'; break;
+            case '*': $op = $name . '=*'; break;
             case '<':
                   if($search[1] == '=') {
-                     $value = substr($value, 1);
-                     $op = ' <= ';
+                     $value = trim(substr($value, 1));
+                     $op = $name . '<=' . $value;
                   } else {
-                     $op = ' < ';
+                     $op = $name . '<' . trim($value); 
                   }
                   break;
             case '>': 
                   if($search[1] == '=') {
-                     $value = substr($value, 1);
-                     $op = ' >= ';
+                     $value = trim(substr($value, 1));
+                     $op = $name . '>=' . $value;
                   } else {
-                     $op = ' > ';
+                     $op = $name . '>' . trim($value); 
                   }
                   break;
-         }    
-         $value = trim($value); 
-         if($no_value) {
-            $s[$name] = $this->Table . '_' . $name  . $op;   
-         } else {
-            $str = $this->Table . '_' . $name . $op;
-            if(is_numeric($value)) {
-               $str .= $value;
-            } else {
-               $str .= '"' . $value . '"';
-            }
-            $s[$name] = $str;
          }
+         $filter .= '(' . $op . ')'; $s++;
       }
-      
-      if(count($s)>0) {
-         if(! isset($searches['_rules'])) {
-            return 'WHERE ' . implode(' AND ', $s);
-         } else {
-            $exp =  'WHERE ' . $searches['_rules'];
-            foreach($s as $k => $v) {
-               $exp = str_replace($k, $v, $exp);
-            }
-            return $exp;
-         }
+     
+      if($s == 1) {
+         return $filter;
+      } else if($s > 1) {
+         return '(|' . $filter . ')';      
       } else {
-         return '';
+         return '(objectclass=*)';
       }
    }
 
    function listing($options) {
       $c = $this->DB->readable();
-      $res = ldap_search($c, '', );
+      $filter = $this->prepareSearch($options['search']);
+      $res = ldap_list($c, $this->_dn(), $this->prepareSearch($options['search']), array('dn'));
+      $ret = array();
+      if($res) {
+         for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
+            $dn = ldap_get_dn($c, $e);
+            $dn = ldap_explode_dn($dn, 0);
+            $r = $this->read($dn[0])[0];
+            $ret[] = $r;
+         }
+      }
+      return $ret;
    }
 }
 ?>
