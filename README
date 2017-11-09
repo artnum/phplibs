@@ -14,3 +14,9 @@ Files
   - SQL.php -> PDO utility class
   - JServerStore.php -> a json rest store, server side
   - HTTPJsonRequest.php -> parse a json http request
+
+
+Lock.php
+--------
+
+Very simple locking mechanism. It is designed to work on shared file system that support flock (like OCFS2).
