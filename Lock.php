@@ -19,7 +19,11 @@ class Lock {
 
       $this->Timeout = 900; /* Timeout default to 15 minutes */
       $this->DB = new \SQLite3($file);
-      $this->DB->exec('CREATE TABLE IF NOT EXISTS `locks` ( `locks_id` VARCHAR(25) UNIQUE NOT NULL, `locks_state` BOOL DEFAULT(0), `locks_timestamp` INTEGER ); CREATE INDEX IF NOT EXISTS `idxLocksID` ON `locks` ( `locks_id`);');
+      try {
+         $this->DB->exec('CREATE TABLE IF NOT EXISTS `locks` ( `locks_id` VARCHAR(25) UNIQUE NOT NULL, `locks_state` BOOL DEFAULT(0), `locks_timestamp` INTEGER ); CREATE INDEX IF NOT EXISTS `idxLocksID` ON `locks` ( `locks_id`);');
+      } catch (\Exception $e) {
+         /* ignore */
+      }
    }
 
    function _is_locked($id) {
@@ -49,7 +53,9 @@ class Lock {
 
    function lock ($id) {
       $l = false;
-      $this->DB->exec('BEGIN IMMEDIATE TRANSACTION');
+      if(! $this->_begin_transaction()) {
+         return true;
+      }
       if(! $this->_is_locked($id)) {
          $stmt = $this->DB->prepare('INSERT OR REPLACE INTO `locks` (`locks_id`, `locks_state`, `locks_timestamp`) VALUES ( :id, 1, :ts)');
          $stmt->bindValue(':id', strval($id), \SQLITE3_TEXT);
@@ -65,12 +71,29 @@ class Lock {
       return $l;
    }
 
+   function _begin_transaction() {
+      $i = 0;
+      $available = false;
+      do {
+         if(! $this->DB->exec('BEGIN IMMEDIATE TRANSACTION')) {
+            usleep(rand(1000, 3000));
+         } else {
+            $available = true;
+         }
+         $i++;
+      } while(!$available && $i < 5);
+      return $available;
+   }
+
    function unlock($id) {
+      if(! $this->_begin_transaction()) {
+         return true;
+      }
+
       if(! $this->_is_locked($id)) {
          return true;
       }
       
-      $this->DB->exec('BEGIN IMMEDIATE TRANSACTION');
       $stmt = $this->DB->prepare('INSERT OR REPLACE INTO `locks` (`locks_id`, `locks_state`, `locks_timestamp`) VALUES ( :id, 0, 0)');
       $stmt->bindValue(':id', strval($id), \SQLITE3_TEXT);
       $stmt->execute();
