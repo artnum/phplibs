@@ -10,9 +10,14 @@ class Lock {
    protected $Timeout;
 
    function __construct($project, $tmpdir = NULL) {
-      $file = $project .'.sqlite';
+      $file = $project .'-lock.sqlite';
       if(is_null($tmpdir)) {
-         $file = sys_get_temp_dir() . '/' . $file;
+         $envdir = getenv('ARTNUM_LOCK_TMPDIR');
+         if(!$envdir) {
+            $file = sys_get_temp_dir() . '/' . $file;
+         } else {
+            $file = $envdir . '/' . $file;
+         }
       } else {
          $file = $tmpdir . '/' . $file;
       }
