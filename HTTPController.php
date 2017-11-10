@@ -60,7 +60,7 @@ class HTTPController
          return array('success' => false, 'msg' => 'No element selected');
       }         
       try {
-         $this->Model->remove($req->getItem());
+         $this->Model->delete($req->getItem());
          return array('success' => true, 'msg' => 'Element deleted');
       } catch(Exception $e) {
          return array('success' => false, 'msg' => $e->getMessage());

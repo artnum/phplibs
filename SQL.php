@@ -65,7 +65,7 @@ class SQL {
    function delete($id) {
       $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1', 
             $this->Table, $this->IDName);
-      $st = $this->db->prepare($pre_statement);
+      $st = $this->DB->prepare($pre_statement);
       $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
       $st->bindParam(':id', $id, $bind_type);
       return $st->execute();
