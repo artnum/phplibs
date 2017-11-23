@@ -72,28 +72,39 @@ class Generic {
 
    function run() {
       if(ctype_alpha($this->request->getCollection())) {
-         try {
-            $model = '\\' . $this->request->getCollection() . 'Model';
-            $model = new $model(NULL, NULL);
-            $model->set_db($this->_db($model));
+         $model = '\\' . $this->request->getCollection() . 'Model';
 
-
-            $controller = '\\' . $this->request->getCollection() . 'Controller';
-            $controller = new $controller($model, NULL);
-         } catch(Exception $e) {
-            $this->fail($e->getMessage());
-         }
-      
-         try {
-            $action = strtolower($this->request->getVerb()) . 'Action';
-            $results = $controller->$action($this->request);
-            if(! $results) {
-               $results = array(); 
+         if(class_exists($model)) {
+            try {
+               $model = new $model(NULL, NULL);
+               $model->set_db($this->_db($model));
+            } catch(Exception $e) {
+               $this->fail($e->getMessage());
             }
-            file_put_contents('php://output',
-                  json_encode(array('type' => 'results', 'data' => $results)));
-         } catch(Exception $e) {
-            $this->fail($e->getMessage());
+         
+            $controller = '\\' . $this->request->getCollection() . 'Controller';
+            if(! class_exists($controller)) {
+               $controller = '\\artnum\HTTPController';
+            }
+            try {
+               $controller = new $controller($model, NULL);
+            } catch(Exception $e) {
+               $this->fail($e->geMessage());
+            }
+      
+            try {
+               $action = strtolower($this->request->getVerb()) . 'Action';
+               $results = $controller->$action($this->request);
+               if(! $results) {
+                  $results = array(); 
+               }
+               file_put_contents('php://output',
+                     json_encode(array('type' => 'results', 'data' => $results)));
+            } catch(Exception $e) {
+               $this->fail($e->getMessage());
+            }
+         } else {
+            $this->fail('Store doesn\'t exist');
          }
       } else {
          $this->fail('Collection not valid');
