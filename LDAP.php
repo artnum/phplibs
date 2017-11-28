@@ -110,7 +110,7 @@ class LDAP  {
    function prepareSearch($searches) {
       $op = ''; $s = 0; $filter='';
       foreach($searches as $name => $terms) {
-         if($name == '_rules') { continue; }
+         if($name[0] == '_') { continue; }
          if(!is_array($terms)) {
             $terms = array($terms);
          }
@@ -146,7 +146,17 @@ class LDAP  {
             $f .= '(' . $op . ')'; $s++;
          }
          if(count($terms) > 1) {
-            $filter .= '(&' . $f . ')';   
+            if(!isset($searches['_' . $name])) {
+               $filter .= '(&' . $f . ')';
+            } else {
+               switch(strtolower($searches['_' . $name])) {
+                  default:
+                  case 'and':
+                     $filter .= '(&' . $f . ')'; break;
+                  case 'or':
+                     $filter .= '(|' . $f . ')'; break;
+               }
+            }
          } else {
             $filter .= $f;
          }
