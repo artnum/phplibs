@@ -109,44 +109,57 @@ class LDAP  {
 
    function prepareSearch($searches) {
       $op = ''; $s = 0; $filter='';
-      foreach($searches as $name => $search) {
+      foreach($searches as $name => $terms) {
          if($name == '_rules') { continue; }
-         $value = substr($search, 1);
-         switch($search[0]) {
-            default:
-               $value = $search;
-            case '=': $op = $name . '=' . trim($value); break;
-            case '~': $op = $name . '~=' . trim($value); break;
-            case '!': $op = '!(' . $name . '=' . trim($value) . ')'; break;
-            case '-': $op = '!(' . $name . '=*)'; break;
-            case '*': $op = $name . '=*'; break;
-            case '<':
-                  if($search[1] == '=') {
-                     $value = trim(substr($value, 1));
-                     $op = $name . '<=' . $value;
-                  } else {
-                     $op = $name . '<' . trim($value); 
-                  }
-                  break;
-            case '>': 
-                  if($search[1] == '=') {
-                     $value = trim(substr($value, 1));
-                     $op = $name . '>=' . $value;
-                  } else {
-                     $op = $name . '>' . trim($value); 
-                  }
-                  break;
+         if(!is_array($terms)) {
+            $terms = array($terms);
          }
-         $filter .= '(' . $op . ')'; $s++;
+         $f = '';
+         foreach($terms as $search) {
+            $value = substr($search, 1);
+            switch($search[0]) {
+               default:
+                  $value = $search;
+               case '=': $op = $name . '=' . trim($value); break;
+               case '~': $op = $name . '~=' . trim($value); break;
+               case '!': $op = '!(' . $name . '=' . trim($value) . ')'; break;
+               case '-': $op = '!(' . $name . '=*)'; break;
+               case '*': 
+                  $op = $name . '=*'; break;
+               case '<':
+                     if($search[1] == '=') {
+                        $value = trim(substr($value, 1));
+                        $op = $name . '<=' . $value;
+                     } else {
+                        $op = $name . '<' . trim($value); 
+                     }
+                     break;
+               case '>': 
+                     if($search[1] == '=') {
+                        $value = trim(substr($value, 1));
+                        $op = $name . '>=' . $value;
+                     } else {
+                        $op = $name . '>' . trim($value); 
+                     }
+                     break;
+            }
+            $f .= '(' . $op . ')'; $s++;
+         }
+         if(count($terms) > 1) {
+            $filter .= '(&' . $f . ')';   
+         } else {
+            $filter .= $f;
+         }
       }
-     
+      
       if($s == 1) {
-         return $filter;
       } else if($s > 1) {
-         return '(|' . $filter . ')';      
+         $filter = '(|' . $filter . ')';      
       } else {
-         return '(objectclass=*)';
+         $filter = '(objectclass=*)';
       }
+
+      return $filter;
    }
 
    function listing($options) {
