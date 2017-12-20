@@ -87,7 +87,7 @@ class SQL {
    }
 
    function prepareSearch($searches) {
-      $op = ''; $no_value = false;
+      $op = ''; $no_value = false; $s = array();
       foreach($searches as $name => $search) {
          if($name == '_rules') { continue; }
          $value = substr($search, 1);
