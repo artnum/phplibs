@@ -24,6 +24,7 @@ class Lock {
 
       $this->Timeout = 900; /* Timeout default to 15 minutes */
       $this->DB = new \SQLite3($file);
+      $this->DBFile = $file;
       try {
          $this->DB->exec('CREATE TABLE IF NOT EXISTS `locks` ( `locks_id` VARCHAR(25) UNIQUE NOT NULL, `locks_state` BOOL DEFAULT(0), `locks_timestamp` INTEGER ); CREATE INDEX IF NOT EXISTS `idxLocksID` ON `locks` ( `locks_id`);');
       } catch (\Exception $e) {
@@ -108,6 +109,41 @@ class Lock {
       return !$l;
    }
 
+   function follow() {
+      header("Content-Type: text/event-stream\n\n");
+      while(ob_get_level() > 0) {
+         ob_end_flush();
+      }
+      flush();
+
+      $locks = array();
+      while(1) {  
+         $DB = new \SQLite3($this->DBFile, SQLITE3_OPEN_READONLY);
+         $stmt = $DB->prepare('SELECT `locks_id`,`locks_state`, `locks_timestamp` FROM `locks`');
+         $res = $stmt->execute();
+         if($res) {
+            while( ($data = $res->fetchArray()) != FALSE) {
+               if(! isset($locks[$data['locks_id']])) {
+                 $locks[$data['locks_id']] = array( 'state' => $data['locks_state'] ? true : false, 'ts' => intval($data['locks_timestamp']));
+                } else {
+                  $current = $locks[$data['locks_id']];
+                  $new = $data['locks_state'];
+                  if($current['state'] != $new) {
+                     $locks[$data['locks_id']]['state'] = $new;
+                     echo 'event: lock' ."\n".  'data: { "target": "' . $data['locks_id'] . '", "status": "'. $new .'" }' . "\n\n";
+                     while(ob_get_level() > 0) {
+                        ob_end_flush();
+                     }
+                     flush();
+                  }         
+               }    
+            }
+         }
+         $DB->close();
+         usleep(600000);
+      }
+   }
+
    function http_locking() {
       if(!empty($_GET['lock'])) {
          if($this->lock($_GET['lock'])) {
@@ -128,6 +164,10 @@ class Lock {
             echo '1';
             return;
          }
+      }
+
+      if(!empty($_GET['follow'])) {
+         $this->follow();
       }
 
       echo '0'; 
