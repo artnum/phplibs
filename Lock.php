@@ -110,6 +110,7 @@ class Lock {
    }
 
    function follow() {
+      $pingCount = 0;
       header("Content-Type: text/event-stream\n\n");
       while(ob_get_level() > 0) {
          ob_end_flush();
@@ -140,7 +141,19 @@ class Lock {
             }
          }
          $DB->close();
-         usleep(600000);
+            
+         if($pingCount > 5) {
+            echo "event: ping\ndata: " . time() . "\n\n"; 
+            while(ob_get_level() > 0) {
+               ob_end_flush();
+            }
+            flush();
+            if(connection_status() != 0) { die(); }
+            $pingCount = 0;
+         }
+
+         $pingCount++;
+         usleep(250000);
       }
    }
 
