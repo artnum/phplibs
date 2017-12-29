@@ -70,11 +70,11 @@ class LDAP  {
 
    function read($dn) {
       $c = $this->DB->readable();
-      $entry = $this->get($dn);
+      $entry = $this->get(rawurldecode($dn));
       if($entry) {
          $dn = ldap_get_dn($c, $entry);
          $dn = ldap_explode_dn($dn, 0);
-         $ret = array('IDent' => $dn[0]);
+         $ret = array('IDent' => rawurlencode($dn[0]));
          foreach($this->Attribute as $attr) {
             $value = ldap_get_values($c, $entry, $attr);
             if($value) {
@@ -181,7 +181,7 @@ class LDAP  {
          for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
             $dn = ldap_get_dn($c, $e);
             $dn = ldap_explode_dn($dn, 0);
-            $r = $this->read($dn[0])[0];
+            $r = $this->read(rawurlencode($dn[0]))[0];
             $ret[] = $r;
          }
       }
