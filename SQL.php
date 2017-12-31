@@ -163,7 +163,7 @@ class SQL {
       foreach($sort as $attr => $dir) {
          $dir = strtoupper($dir);
          if($dir == 'ASC' || $dir == 'DESC') {
-            $o[] = $attr . ' ' . $dir;
+            $o[] = $this->Table . '_' . $attr . ' ' . $dir;
          }
       }
 
