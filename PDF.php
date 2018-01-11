@@ -36,13 +36,21 @@ class PDF extends \tFPDF {
    protected $tabbed_align = false;
    protected $current_line_max = 0;
    protected $page_count = 0;
-protected $path = '';
+   protected $unbreaked_line = false;
+   protected $last_font_size = 0;
+   protected $tagged_fonts = array();
 
    function __construct() {
       parent::tFPDF();
+      $this->last_font_size = $this->FontSize;
+   }
+
+   function resetFontSize() {
+      $this->setFontSize($this->last_font_size);
    }
 
    function setFontSize($mm) {
+      $this->last_font_size = $this->FontSize;
       $this->FontSize = $mm;
       $this->FontSizePt = $mm * $this->k;
       if($this->page>0) {
@@ -58,6 +66,21 @@ protected $path = '';
       return $this->FontSize;
    }
 
+   function getFontWidth() {
+      return $this->GetStringWidth('o');
+   }
+
+   function addTaggedFont($tag, $family, $style = '', $file = '', $uni = false) {
+      $this->AddFont($family, $style, $file, $uni);
+      $this->tagged_fonts[$tag] = $family; 
+   }
+
+   function setTaggedFont($tag) {
+      if(isset($this->tagged_fonts[$tag])) {
+         $this->SetFont($this->tagged_fonts[$tag]);
+      }
+   }
+
    function set($name, $content) {
       $this->doc[$name] = $content;
    }
@@ -67,6 +90,14 @@ protected $path = '';
    }
 
    function addTab($mm, $align = 'left') {
+      if(is_string($mm)) {
+         switch($mm) {
+            default:
+            case 'right': $mm = $this->w  - ($this->rMargin + $this->lMargin + $this->getFontWidth()) ; break;
+            case 'left': $mm =0; break;
+            case 'middle': $mm = ($this->w / 2) - ($this->lMargin + $this->getFontWidth()); break;
+         }
+      }
       $this->tabs[] = array($mm, $align);
    }
 
@@ -88,7 +119,30 @@ protected $path = '';
       $this->setY($this->getY() + $mm);
    }
 
+   function printTaggedLn($txt, $options = array()) {
+      $break = isset($options['break']) ? $options['break'] : true;
+      foreach($txt as $t) {
+         if($t[0] == '%') {
+            if(isset($this->tagged_fonts[substr($t, 1)])) {
+               $this->setTaggedFont(substr($t, 1));
+            } else {
+               $o = $options; $o['break'] = false;
+               $this->printLn($t, $o);
+            }
+         } else {
+            $o = $options; $o['break'] = false;
+            $this->printLn($t, $o);
+         }
+      }
+       
+      if($break) {
+         $this->br();
+      }
+   }
+
    function printLn($txt, $options = array()) {
+      $this->unbreaked_line = false;
+
       $break = isset($options['break']) ? $options['break'] : true;
       $linespacing = isset($options['linespacing']) ? $options['linespacing'] : 'single';
       $align = isset($options['align']) ? $options['align'] : $this->current_align;
@@ -111,17 +165,6 @@ protected $path = '';
 
       }
 
-      /* http://practicaltypography.com/line-spacing.html */
-      if(is_string($linespacing)) {
-         switch($linespacing) {
-            default: case 'single': $linespacing = 1.20 ;
-            case '1.5': $linespacing = 1.32;
-            case 'double': $linespacing = 1.45 ;
-         }
-      } else if(is_numeric($linespacing)) {
-         $linespacing = $linespacing / 100;
-      } 
-
       switch($align) {
          default:
          case 'left':
@@ -140,20 +183,52 @@ protected $path = '';
       }
 
       if($break) {
-         $lineheight = ($linespacing * $this->current_line_max);
-         if($this->current_line_max == 0) {
-            $lineheight = ($linespacing * $height);
-         }
-         $this->SetY($this->GetY() +  $lineheight, true);
-         $this->current_line_max = 0;
-         if($this->tabbed_align) {
-            $this->current_align = 'left';
-         }
+         $this->br($linespacing);
       } else {
          if($this->FontSize > $this->current_line_max) {
             $this->current_line_max = $this->FontSize;
+            $this->unbreaked_line = true;
          }
       }
+   }
+
+   function getLineHeight($linespacing = 'single') {
+      $height = $this->getFontSize();
+
+      /* http://practicaltypography.com/line-spacing.html */
+      if(is_string($linespacing)) {
+         switch($linespacing) {
+            default: case 'single': $linespacing = 1.20 ;
+            case '1.5': $linespacing = 1.32;
+            case 'double': $linespacing = 1.45 ;
+         }
+      } else if(is_numeric($linespacing)) {
+         $linespacing = $linespacing / 100;
+      } 
+
+      $lineheight = ($linespacing * $this->current_line_max);
+      if($this->current_line_max == 0) {
+         $lineheight = ($linespacing * $height);
+      }
+      
+      return $lineheight; 
+   }
+
+   function br($linespacing = 'single') {
+      $this->SetY($this->GetY() +  $this->getLineHeight($linespacing), true);
+      $this->current_line_max = 0;
+      if($this->tabbed_align) {
+         $this->current_align = 'left';
+      }
+   }
+
+   function hr() {
+      $y = $this->GetY();
+      if($this->unbreaked_line) {
+         $this->br();
+      }
+      $this->Line($this->lMargin, $y, $this->w - ($this->rMargin), $y);
+      $this->br(50);
    }
 }
 ?>
