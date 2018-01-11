@@ -36,6 +36,7 @@ class PDF extends \tFPDF {
    protected $tabbed_align = false;
    protected $current_line_max = 0;
    protected $page_count = 0;
+protected $path = '';
 
    function __construct() {
       parent::tFPDF();
@@ -153,20 +154,6 @@ class PDF extends \tFPDF {
             $this->current_line_max = $this->FontSize;
          }
       }
-   }
-
-   function AddPage($orientation = '', $size = '') {
-      parent::AddPage();
-      $this->page_count++;
-      $this->pageLines();
-      if($this->page_count > 1) {
-         $this->addBillCode(false); 
-      } else {
-         $this->addBillCode(true);
-      }
-
-      $this->SetX($this->lMargin);
-      $this->SetY($this->tMargin);
    }
 }
 ?>
