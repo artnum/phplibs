@@ -242,9 +242,74 @@ class PDF extends \tFPDF {
       }
    }
 
+   function getXYFromAL($x1, $y1, $x2, $y2) {
+      /* Inverse Y coordinate to match PDF / circle coordinate */
+      $angle = rad2deg(atan2(((-$y2)-(-$y1)), ($x2 - $x1)));
+      $length = sqrt(pow($x2 - $x1, 2) + pow($y2 - $y1, 2));
+      return array($angle, $length); 
+   }
+
+   function drawLineXY($x1, $y1, $x2, $y2, $type = 'line', $options = array()) {
+      list($angle, $length) = $this->getXYFromAL($x1, $y1, $x2, $y2);
+      $this->drawLine($x1, $y1, $length, $angle, $type, $options);
+   }
+
+   function drawLine($x1, $y1, $length, $angle = 0, $type = 'line', $options = array()) {
+      $dashSize = 1;
+      if(isset($options['dash-size'])) {
+         $dashSize = $options['dash-size'];
+      }
+
+      $dashSpace = pow($dashSize, 1/3);
+      if(isset($options['dash-space'])) {
+         $dashSapce = $options['dash-space'];
+      }
+
+      /* We use angle of circle which start at 3 o'clock (0°) and goes
+         counter-clockwise (12 o'clock => 90 ...) but x,y are reversed in PDF
+         so we just reverse the angle */
+      $angle = - $angle;
+      $x2 = $x1 + $length * cos(deg2rad($angle));
+      $y2 = $y1 + $length * sin(deg2rad($angle));
+
+      if($type == 'line') {
+         $this->Line($x1, $y1, $x2, $y2);
+      } else {
+         switch($type) {
+            case 'dashed':
+               $totalLength = 0;
+               while($totalLength <= $length) {
+                  if($totalLength + $dashSize > $length) {
+                     $this->drawLine($x1, $y1, $length - $totalLength, - $angle, 'line', $options); 
+                  } else {
+                     $this->drawLine($x1, $y1, $dashSize, - $angle, 'line', $options); 
+                  }
+                  $x1 = $x1 + ($dashSize + $dashSpace) * cos(deg2rad($angle));
+                  $y1 = $y1 + ($dashSize + $dashSpace) * sin(deg2rad($angle));
+                  $totalLength += ($dashSize + $dashSpace);
+               }
+               break;
+            case 'dotted':
+               $this->drawLine($x1, $y1, $length, $angle, 'dashed', array( 
+                        'dash-size'=> 0.1, 'dash-space'=> 0.1
+                        ));
+               break;
+         }
+      }
+   }
+
    function squaredFrame($height, $options = array()) {
+      $prevLineWidth = $this->LineWidth;
+      $prevDrawColor = $this->DrawColor;
+
       $lineWidth = isset($options['line']) ? $options['line'] : 0.2;
       $squareSize = isset($options['square']) ? $options['square'] : 4;
+      $lineType = isset($options['line-type']) ? $options['line-type'] : 'line';
+     
+      $vertical = true;
+      if($options['lined']) {
+         $vertical = false;
+      }
       
       if(isset($options['color'])) {
          $this->setColor($options['color'], 'draw');
@@ -254,9 +319,10 @@ class PDF extends \tFPDF {
    
       $this->SetLineWidth($lineWidth);
 
-      $lineX = $startX = $this->lMargin;
-      $lineY = $startY = $this->GetY();
+      $lineX = $startX = isset($options['x-origin']) ? $options['x-origin'] : $this->lMargin;
+      $lineY = $startY = isset($options['y-origin']) ? $options['y-origin'] : $this->GetY();
       $lenX = $stopX = $this->w - $this->rMargin;
+      $lenX -= $startX;
       $lenY = $stopY = $startY + $height;
 
 
@@ -269,11 +335,13 @@ class PDF extends \tFPDF {
          $border = true;
       }
 
-      for($i = $lineX; $i <= $stopX; $i += $squareSize) {
-         $this->Line($i, $startY, $i, $lenY);
+      if($vertical) {
+         for($i = $lineX; $i <= $stopX; $i += $squareSize) {
+            $this->drawLine($i, $startY, $height, 270, $lineType);
+         }
       }
       for($i = $lineY; $i <= $stopY; $i += $squareSize) {
-         $this->Line($startX, $i, $lenX, $i);
+         $this->drawLine($startX, $i, $lenX, 0, $lineType) ;
       }
 
       if($border) {
@@ -283,12 +351,17 @@ class PDF extends \tFPDF {
          if(isset($options['border-color'])) {
             $this->setColor($options['border-color'], 'draw');
          }
-
-         $this->Line($startX, $startY, $lenX, $startY);
-         $this->Line($startX, $startY, $startX, $lenY);
-         $this->Line($startX, $lenY, $lenX, $lenY);
-         $this->Line($lenX, $startY, $lenX, $lenY);
+         
+         $this->drawLine($startX, $startY, $lenX);
+         $this->drawLine($startX, $startY, $height, 270);
+         $this->drawLine($stopX + $squareSize, $stopY + $squareSize, $height, 90);
+         $this->drawLine($stopX + $squareSize, $stopY + $squareSize, $lenX, 180);
       }
+
+      /* Reset to previous state */
+      $this->SetLineWidth($prevLineWidth);
+      $this->DrawColor = $prevDrawColor;
+      $this->_out($this->DrawColor);
    }
 
    function getLineHeight($linespacing = 'single') {
