@@ -192,6 +192,105 @@ class PDF extends \tFPDF {
       }
    }
 
+   function setColor($hex, $what = 'text') {
+
+      switch($hex) {
+         /* CSS Level 1 */
+         case 'black':     $hex = '000'; break;
+         case 'silver':    $hex = 'c0c0c0'; break;
+         case 'gray':      $hex = '808080'; break;
+         case 'white':     $hex = 'fff'; break;
+         case 'maroon':    $hex = '800000'; break;
+         case 'red':       $hex = 'ff0000'; break;
+         case 'purple':    $hex = '800080'; break;
+         case 'fuchsia':   $hex = 'ff00ff'; break;
+         case 'green':     $hex = '008000'; break;
+         case 'lime':      $hex = '00ff00'; break;
+         case 'olive':     $hex = '808000'; break;
+         case 'yellow':    $hex = 'ffff00'; break;
+         case 'navy':      $hex = '000080'; break;
+         case 'blue':      $hex = '0000ff'; break;
+         case 'teal':      $hex = '008080'; break;
+         case 'aqua':      $hex = '00ffff'; break;
+      }
+
+      $r = 0; $g = 0; $b = 0;
+      if($hex[0] == '#') {
+         $hex = substr($hex, 1);
+      }
+      
+      $h1 = ''; $h2 = ''; $h3 = '';
+      if(strlen($hex) == 3) {
+         $h1 = $hex[0] . $hex[0];
+         $h2 = $hex[1] . $hex[1];
+         $h3 = $hex[2] . $hex[2];
+      } else {
+         $h1 = substr($hex, 0, 2) ? substr($hex, 0, 2) : 'ff';
+         $h2 = substr($hex, 2, 2) ? substr($hex, 2, 2) : 'ff';
+         $h3 = substr($hex, 4, 2) ? substr($hex, 4, 2) : 'ff';
+      }
+
+      $r = hexdec($h1);
+      $g = hexdec($h2);
+      $b = hexdec($h3);
+
+      switch(strtolower($what)) {
+         case 'text' : default: $this->SetTextColor($r, $g, $b); break;
+         case 'draw': $this->SetDrawColor($r, $g, $b); break;
+         case 'fill': $this->SetFillColor($r, $g, $b); break;
+
+      }
+   }
+
+   function squaredFrame($height, $options = array()) {
+      $lineWidth = isset($options['line']) ? $options['line'] : 0.2;
+      $squareSize = isset($options['square']) ? $options['square'] : 4;
+      
+      if(isset($options['color'])) {
+         $this->setColor($options['color'], 'draw');
+      } else {
+         $this->setColor('black', 'draw');
+      }
+   
+      $this->SetLineWidth($lineWidth);
+
+      $lineX = $startX = $this->lMargin;
+      $lineY = $startY = $this->GetY();
+      $lenX = $stopX = $this->w - $this->rMargin;
+      $lenY = $stopY = $startY + $height;
+
+
+      $border = false;
+      if(isset($options['border']) && $options['border']) {
+         $lineX += $squareSize;
+         $lineY += $squareSize;
+         $stopX -= $squareSize;
+         $stopY -= $squareSize;
+         $border = true;
+      }
+
+      for($i = $lineX; $i <= $stopX; $i += $squareSize) {
+         $this->Line($i, $startY, $i, $lenY);
+      }
+      for($i = $lineY; $i <= $stopY; $i += $squareSize) {
+         $this->Line($startX, $i, $lenX, $i);
+      }
+
+      if($border) {
+         if(isset($options['border-line'])) {
+            $this->SetLineWidth($options['border-line']);
+         }      
+         if(isset($options['border-color'])) {
+            $this->setColor($options['border-color'], 'draw');
+         }
+
+         $this->Line($startX, $startY, $lenX, $startY);
+         $this->Line($startX, $startY, $startX, $lenY);
+         $this->Line($startX, $lenY, $lenX, $lenY);
+         $this->Line($lenX, $startY, $lenX, $lenY);
+      }
+   }
+
    function getLineHeight($linespacing = 'single') {
       $height = $this->getFontSize();
 
