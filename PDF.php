@@ -255,6 +255,12 @@ class PDF extends \tFPDF {
    }
 
    function drawLine($x1, $y1, $length, $angle = 0, $type = 'line', $options = array()) {
+      $prevDrawColor = $this->DrawColor;
+      
+      if(isset($options['color'])) {
+         $this->setColor($options['color'], 'draw');
+      }
+
       $dashSize = 1;
       if(isset($options['dash-size'])) {
          $dashSize = $options['dash-size'];
@@ -290,12 +296,15 @@ class PDF extends \tFPDF {
                }
                break;
             case 'dotted':
-               $this->drawLine($x1, $y1, $length, $angle, 'dashed', array( 
+               $this->drawLine($x1, $y1, $length, $angle, 'dashed', array_merge(array( 
                         'dash-size'=> 0.1, 'dash-space'=> 0.1
-                        ));
+                        ), $options));
                break;
          }
       }
+
+      $this->DrawColor = $prevDrawColor;
+      $this->_out($this->DrawColor);
    }
 
    function squaredFrame($height, $options = array()) {
@@ -307,7 +316,7 @@ class PDF extends \tFPDF {
       $lineType = isset($options['line-type']) ? $options['line-type'] : 'line';
      
       $vertical = true;
-      if($options['lined']) {
+      if(isset($options['lined']) && $options['lined']) {
          $vertical = false;
       }
       
@@ -327,12 +336,14 @@ class PDF extends \tFPDF {
 
 
       $border = false;
-      if(isset($options['border']) && $options['border']) {
+      if((isset($options['border']) && $options['border']) || (isset($options['skip']) && $options['skip'])) {
          $lineX += $squareSize;
          $lineY += $squareSize;
          $stopX -= $squareSize;
          $stopY -= $squareSize;
-         $border = true;
+         if(isset($options['border']) && $options['border']) {
+            $border = true;
+         }
       }
 
       if($vertical) {
@@ -345,10 +356,10 @@ class PDF extends \tFPDF {
       }
 
       if($border) {
-         if(isset($options['border-line'])) {
+         if(isset($options['border-line']) && $options['border-line']) {
             $this->SetLineWidth($options['border-line']);
          }      
-         if(isset($options['border-color'])) {
+         if(isset($options['border-color']) && $options['border-line']) {
             $this->setColor($options['border-color'], 'draw');
          }
          
@@ -362,6 +373,10 @@ class PDF extends \tFPDF {
       $this->SetLineWidth($prevLineWidth);
       $this->DrawColor = $prevDrawColor;
       $this->_out($this->DrawColor);
+   }
+
+   function getRemainingWidth() {
+      return $this->w - ($this->rMargin + $this->GetX());
    }
 
    function getLineHeight($linespacing = 'single') {
@@ -394,13 +409,21 @@ class PDF extends \tFPDF {
       }
    }
 
-   function hr() {
+   function hr($fontsize = 0) {
       $y = $this->GetY();
       if($this->unbreaked_line) {
          $this->br();
       }
+      if($fontsize != 0) {
+         $this->setFontSize($fontsize);
+      }
+
       $this->Line($this->lMargin, $y, $this->w - ($this->rMargin), $y);
       $this->br(50);
+
+      if($fontsize != 0) {
+         $this->resetFontSize();
+      }
    }
 }
 ?>
