@@ -34,12 +34,22 @@ class JRestClient {
    protected $headers;
    protected $body_raw;
    protected $http_code;
+   protected $tls;
 
-   function __construct($url, $collection = NULL) {
+   function __construct($url, $collection = NULL, $tls = array()) {
       $this->url = $url;
       $this->collection = $collection;
+      $this->tls = $tls;
    }
-   
+  
+   protected function _tsl() {
+      if(isset($tls['verifypeer']) && !$tls['verifypeer']) {
+         \curl_setopt($this->ch, \CURL_SSL_VERIFYPEER, false);   
+      } else {
+         \curl_setopt($this->ch, \CURL_SSL_VERIFYPEER, true);   
+      }
+   }
+
    protected function _init($url = NULL) {
       $this->ch = \curl_init();
       if(\is_null($url)) {
@@ -49,6 +59,7 @@ class JRestClient {
       \curl_setopt($this->ch, \CURLOPT_URL, $url);
       \curl_setopt($this->ch, \CURLOPT_RETURNTRANSFER, true);
       \curl_setopt($this->ch, \CURLOPT_HEADER, 1);
+      $this->_tls();
    }
 
    protected function _build_url($elements = array(), $collection = NULL, $url = NULL) {
@@ -200,7 +211,6 @@ class JRestClient {
 
       \curl_close($this->ch);
       $this->_parse_header($header_txt);
-
       if(isset($this->header['Content-MD5'])) {
          if(\strcasecmp($this->getVar('body_sum'), $this->getVar('Content-MD5')) != 0) {
             echo 'MD5 Fail' . PHP_EOL;
