@@ -147,18 +147,41 @@ class PDF extends \tFPDF {
       $linespacing = isset($options['linespacing']) ? $options['linespacing'] : 'single';
       $align = isset($options['align']) ? $options['align'] : $this->current_align;
       $underline = isset($options['underline']) ? $options['underline'] : false;
+      $max_width = isset($options['max-width']) ? $options['max-width'] : $this->w -( $this->GetX() + $this->rMargin);
 
       $height = $this->getFontSize();
       $width = $this->GetStringWidth($txt);
       $underline_start = $this->GetX();
 
-      if($width > $this->w -( $this->GetX() + $this->rMargin)) {
+      if($width > $max_width) {
          switch($align) {
             case 'left':
             default:
-               $txt = 'trop long : ' .( $this->w - ($this->GetX() + $this->rMargin));
-               $width = $this->GetStringWidth($txt);
-               break;
+               $ttxt = explode(' ', $txt);
+               $sub = '';
+               for($i = 0; $i < count($ttxt); $i++) {
+                  if($this->GetStringWidth($sub . ' ' . $ttxt[$i]) > $max_width) {
+                     if(isset($options['break']) && !$options['break']) {
+                        $options['break'] = true;
+                     }
+
+                     $this->printLn($sub, $options);
+                     $sub = '';
+                  }
+
+                  if($sub == '') {
+                     $sub = $ttxt[$i];
+                  } else {
+                     $sub .= ' ' . $ttxt[$i];
+                  }
+               }
+               if($sub != '' && !empty($sub)) {
+                  $txt = $sub;
+                  $width = $this->GetStringWidth($txt);
+                  break;
+               } else {
+                  return;
+               }
             case 'right':
                break;
          }
@@ -310,7 +333,8 @@ class PDF extends \tFPDF {
    function squaredFrame($height, $options = array()) {
       $prevLineWidth = $this->LineWidth;
       $prevDrawColor = $this->DrawColor;
-
+      
+      $maxLength = isset($options['length']) ? $options['length'] : ($this->w - ($this->rMargin + $this->lMargin));
       $lineWidth = isset($options['line']) ? $options['line'] : 0.2;
       $squareSize = isset($options['square']) ? $options['square'] : 4;
       $lineType = isset($options['line-type']) ? $options['line-type'] : 'line';
@@ -330,10 +354,11 @@ class PDF extends \tFPDF {
 
       $lineX = $startX = isset($options['x-origin']) ? $options['x-origin'] : $this->lMargin;
       $lineY = $startY = isset($options['y-origin']) ? $options['y-origin'] : $this->GetY();
-      $lenX = $stopX = $this->w - $this->rMargin;
-      $lenX -= $startX;
+      $lenX = $stopX =  $maxLength;
+      if($lineX != $this->lMargin && !isset($options['length'])) {
+         $lenX = $this->w - ($lineX + $this->rMargin);
+      }
       $lenY = $stopY = $startY + $height;
-
 
       $border = false;
       if((isset($options['border']) && $options['border']) || (isset($options['skip']) && $options['skip'])) {
@@ -347,7 +372,7 @@ class PDF extends \tFPDF {
       }
 
       if($vertical) {
-         for($i = $lineX; $i <= $stopX; $i += $squareSize) {
+         for($i = $lineX; $i <= $stopX + $startX; $i += $squareSize) {
             $this->drawLine($i, $startY, $height, 270, $lineType);
          }
       }
@@ -365,8 +390,8 @@ class PDF extends \tFPDF {
          
          $this->drawLine($startX, $startY, $lenX);
          $this->drawLine($startX, $startY, $height, 270);
-         $this->drawLine($stopX + $squareSize, $stopY + $squareSize, $height, 90);
-         $this->drawLine($stopX + $squareSize, $stopY + $squareSize, $lenX, 180);
+         $this->drawLine($lenX + $startX , $stopY + $squareSize, $height, 90);
+         $this->drawLine($lenX + $startX, $stopY + $squareSize, $lenX, 180);
       }
 
       /* Reset to previous state */
