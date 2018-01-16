@@ -42,11 +42,11 @@ class JRestClient {
       $this->tls = $tls;
    }
   
-   protected function _tsl() {
-      if(isset($tls['verifypeer']) && !$tls['verifypeer']) {
-         \curl_setopt($this->ch, \CURL_SSL_VERIFYPEER, false);   
+   protected function _tls() {
+      if(isset($this->tls['verifypeer']) && !$this->tls['verifypeer']) {
+         \curl_setopt($this->ch, \CURLOPT_SSL_VERIFYPEER, false);   
       } else {
-         \curl_setopt($this->ch, \CURL_SSL_VERIFYPEER, true);   
+         \curl_setopt($this->ch, \CURLOPT_SSL_VERIFYPEER, true);   
       }
    }
 
