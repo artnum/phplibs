@@ -158,30 +158,33 @@ class PDF extends \tFPDF {
             case 'left':
             default:
                $ttxt = explode(' ', $txt);
-               $sub = '';
-               for($i = 0; $i < count($ttxt); $i++) {
-                  if($this->GetStringWidth($sub . ' ' . $ttxt[$i]) > $max_width) {
-                     if(isset($options['break']) && !$options['break']) {
-                        $options['break'] = true;
+               if(count($ttxt) > 1) {
+                  $sub = '';
+                  for($i = 0; $i < count($ttxt); $i++) {
+                     if($this->GetStringWidth($sub . ' ' . $ttxt[$i]) > $max_width) {
+                        if(isset($options['break']) && !$options['break']) {
+                           $options['break'] = true;
+                        }
+
+                        $this->printLn($sub, $options);
+                        $sub = '';
                      }
 
-                     $this->printLn($sub, $options);
-                     $sub = '';
+                     if($sub == '') {
+                        $sub = $ttxt[$i];
+                     } else {
+                        $sub .= ' ' . $ttxt[$i];
+                     }
                   }
-
-                  if($sub == '') {
-                     $sub = $ttxt[$i];
+                  if($sub != '' && !empty($sub)) {
+                     $txt = $sub;
+                     $width = $this->GetStringWidth($txt);
+                     break;
                   } else {
-                     $sub .= ' ' . $ttxt[$i];
+                     return;
                   }
                }
-               if($sub != '' && !empty($sub)) {
-                  $txt = $sub;
-                  $width = $this->GetStringWidth($txt);
-                  break;
-               } else {
-                  return;
-               }
+               break;
             case 'right':
                break;
          }
