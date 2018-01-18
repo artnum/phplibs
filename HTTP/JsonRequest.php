@@ -26,26 +26,18 @@
  */
 Namespace artnum\HTTP;
 
-class JsonRequest
+class JsonRequest extends Path
 {
-   public $url_elements;
    public $parameters;
    public $verb;
    public $protocol;
 
    function __construct()
    {
+      parent::__construct();
+
       $this->verb = $_SERVER['REQUEST_METHOD'];
       $this->protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
-      $this->url_elements = array();
-
-      $url_elements = explode('/', $_SERVER['PATH_INFO']);
-      foreach($url_elements as $e) {
-         if(! empty($e)) {
-            $this->url_elements[] = $e;
-         }
-      }
-
       $this->parseParams();
    }
 
