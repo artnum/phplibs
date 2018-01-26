@@ -154,6 +154,7 @@ class PDF extends \tFPDF {
       $underline_start = $this->GetX();
 
       if($width > $max_width) {
+         $fromX = $this->GetX();
          switch($align) {
             case 'left':
             default:
@@ -167,6 +168,7 @@ class PDF extends \tFPDF {
                         }
 
                         $this->printLn($sub, $options);
+                        $this->SetX($fromX);
                         $sub = '';
                      }
 
