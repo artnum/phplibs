@@ -98,8 +98,17 @@ class Generic {
                if(! $results) {
                   $results = array(); 
                }
-               file_put_contents('php://output',
-                     json_encode(array('type' => 'results', 'data' => $results)));
+               switch(strtolower($this->request->getVerb())) {
+                  default:
+                     file_put_contents('php://output', 
+                           json_encode(array('type' => 'results', 'data' => $results)));
+                     break;
+                  case 'head':
+                     foreach($results as $k => $v) {
+                        header('X-Artnum-' . $k . ': ' . $v);
+                     }
+                     break;
+               }
             } catch(Exception $e) {
                $this->fail($e->getMessage());
             }

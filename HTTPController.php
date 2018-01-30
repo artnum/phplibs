@@ -34,6 +34,18 @@ class HTTPController
       $this->Model = $model;
    }
 
+   function headAction($req) {
+      try {
+         if($req->onCollection()) {
+            return array('last-id' => $this->Model->getLastId($req->getParameters()));
+         } else if($req->onItem()) {
+            return array('last-modification' => $this->Model->getLastMod($req->getItem()));
+         }
+      } catch(Exception $e) {
+         return array('error' => $e->getMessage());
+      }
+   }
+
    function getAction($req) {
       try {
          if($req->onCollection()) {

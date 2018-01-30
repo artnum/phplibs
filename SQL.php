@@ -86,6 +86,20 @@ class SQL {
       return NULL;
    }
 
+   function getLastId($params) {
+      $pre_statement = sprintf('SELECT MAX(`%s`) FROM `%s`', $this->IDName, $this->Table);
+      $st = $this->DB->prepare($pre_statement);
+      if($st->execute()) {
+         return $st->fetch(\PDO::FETCH_NUM)[0];
+      }
+
+      return '0';
+   }
+
+   function getLastMod($item) {
+      return '0';
+   }
+
    function prepareSearch($searches) {
       $op = ''; $no_value = false; $s = array();
       foreach($searches as $name => $search) {
