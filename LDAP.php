@@ -174,7 +174,9 @@ class LDAP  {
 
    function listing($options) {
       $c = $this->DB->readable();
-      $filter = $this->prepareSearch($options['search']);
+      if(isset($options['search'])) {
+            $filter = $this->prepareSearch($options['search']);
+      }
       $res = ldap_list($c, $this->_dn(), $this->prepareSearch($options['search']), array('dn'));
       $ret = array();
       if($res) {
