@@ -121,6 +121,12 @@ class JRestClient {
       return $this->exec();
    }
 
+   function direct($url) {
+      $this->_init($url);
+      \curl_setopt($this->ch, \CURLOPT_HTTPGET, TRUE);
+      return $this->exec();
+   }
+
    /* Get an element */
    function get($id, $collection = NULL) {
       $this->_init($this->_build_url(array($id), $collection));
