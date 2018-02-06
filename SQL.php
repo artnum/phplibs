@@ -96,7 +96,31 @@ class SQL {
       return '0';
    }
 
+   function getTableLastMod() {
+      if($this->conf('mtime')) {
+         $pre_statement = sprintf('SELECT MAX(`%s`) FROM `%s`', $this->conf('mtime'), $this->Table);
+         $st = $this->DB->prepare($pre_statement);
+         if($st->execute()) {
+            return $st->fetch(\PDO::FETCH_NUM)[0];
+         }
+      }
+
+      return '0';
+
+   }
+
    function getLastMod($item) {
+      if(!is_null($this->conf('mtime'))) {
+         $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE `%s` = :id', $this->conf('mtime'), $this->Table, $this->IDName);
+         $st = $this->DB->prepare($pre_statement);
+         if($st) {
+            $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+            $st->bindParam(':id', $item, $bind_type);
+            if($st->execute()) {
+               return $st->fetch(\PDO::FETCH_NUM)[0];
+            }
+         }
+      }
       return '0';
    }
 
@@ -331,6 +355,13 @@ class SQL {
       foreach($data as $k => $v) {
          $prefixed[$this->Table . '_' . $k] = $v;
       }
+
+      if(!is_null($this->conf('mtime'))) {
+         $now = new \DateTime('now', new \DateTimeZone('UTC')); $now = $now->format('c');
+         $prefixed[$this->conf('mtime')] = $now;
+         
+      }
+
       if(!isset($prefixed[$this->IDName]) || empty($prefixed[$this->IDName])) {
          return $this->create($prefixed);
       } else {

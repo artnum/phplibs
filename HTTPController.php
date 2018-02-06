@@ -37,7 +37,7 @@ class HTTPController
    function headAction($req) {
       try {
          if($req->onCollection()) {
-            return array('last-id' => $this->Model->getLastId($req->getParameters()));
+            return array('last-id' => $this->Model->getLastId($req->getParameters()), 'last-modification' => $this->Model->getTableLastMod());
          } else if($req->onItem()) {
             return array('last-modification' => $this->Model->getLastMod($req->getItem()));
          }
