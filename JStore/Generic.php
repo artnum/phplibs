@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2017 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2018 Etienne Bagnoud <etienne@artisan-numerique.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,9 +30,22 @@ class Generic {
    public $db;
    public $request;
    protected $dbs;
+   protected $auths;
+   protected $authpath;
+   protected $session;
+   protected $nosession;
 
-   function __construct($http_request = NULL, $dont_run = false) {
+   function __construct($http_request = NULL, $dont_run = false, $options = array()) {
       $this->dbs = array();
+      $this->auths = array();
+      $this->authpath = 'auth';
+
+      if(isset($options['session'])) {
+         $this->session = $options['session'];
+      } else {
+         $this->session = new Session();
+      }
+
       if(is_null($http_request)) {
          try {
             $this->request = new \artnum\HTTP\JsonRequest();
@@ -56,6 +69,28 @@ class Generic {
       $this->dbs[$type][] = $db;
    }
 
+   function add_auth($auth_source) {
+      $duplicate = false;
+      foreach($this->auths as $auth) {
+         if(strcmp($auth->getName(), $auth_source->getName()) == 0) {
+            $duplicate = true;
+         }
+      }
+
+      if($duplicate) {
+         return false;
+      } else {
+         array_push($this->auths, $auth_source);
+      }
+      return true;
+   }
+
+   function set_authpath($path) {
+      if(ctype_alpha($path)) {
+         $this->authpath = $path;
+      }
+   }
+
    function _db($m) {
       $type = $m->dbtype();
       if(isset($this->dbs[$type])) {
@@ -71,60 +106,98 @@ class Generic {
 
 
    function run() {
-      if(ctype_alpha($this->request->getCollection())) {
-         $model = '\\' . $this->request->getCollection() . 'Model';
+      $this->session->start();
 
-         if(class_exists($model)) {
-            try {
-               $model = new $model(NULL, NULL);
-               $model->set_db($this->_db($model));
-            } catch(Exception $e) {
-               $this->fail($e->getMessage());
-            }
-         
-            $controller = '\\' . $this->request->getCollection() . 'Controller';
-            if(! class_exists($controller)) {
-               $controller = '\\artnum\HTTPController';
-            }
-            try {
-               $controller = new $controller($model, NULL);
-            } catch(Exception $e) {
-               $this->fail($e->geMessage());
-            }
-      
-            try {
-               $action = strtolower($this->request->getVerb()) . 'Action';
-               $results = $controller->$action($this->request);
-               if(! $results) {
-                  $results = array(); 
-               }
-               switch(strtolower($this->request->getVerb())) {
-                  default:
-                     file_put_contents('php://output', 
-                           json_encode(array('type' => 'results', 'data' => $results)));
+      if(ctype_alpha($this->request->getCollection())) {
+         if(strcmp($this->request->getCollection(), $this->authpath) == 0) {
+            if(! $this->request->onItem()) {
+               $this->fail('Authentication must have an object');
+            } else {
+               $validation = false;
+               foreach($this->auths as $auth) {
+                  $validation = $auth->authenticate($this->request);
+                  if($validation) {
                      break;
-                  case 'head':
-                     foreach($results as $k => $v) {
-                        header('X-Artnum-' . $k . ': ' . $v);
-                     }
-                     break;
+                  }
                }
-            } catch(Exception $e) {
-               $this->fail($e->getMessage());
+
+               if(!$validation) {
+                  $this->fail('Not valid');
+               }
+               setcookie('artnum-authid', $validation, time() + 3600, '/');
             }
          } else {
-            $this->fail('Store doesn\'t exist');
+            $valid_auth = null;
+            foreach($this->auths as $auth) {
+               if($auth->verify($this->request)) {
+                  $valid_auth = $auth;
+                  break;
+               }
+            }
+            if( ! is_null($valid_auth) && count($this->auths) > 0) {
+               if(! $valid_auth && count($this->auths) > 0) {
+                  $this->fail('Forbidden', 403);
+               } else {
+                  if(! $auth->authorize($this->request)) {
+                     $this->fail('Forbidden', 403);
+                  }
+               }
+            }
+
+            $model = '\\' . $this->request->getCollection() . 'Model';
+
+            if(class_exists($model)) {
+               try {
+                  $model = new $model(NULL, NULL);
+                  $model->set_db($this->_db($model));
+               } catch(Exception $e) {
+                  $this->fail($e->getMessage());
+               }
+            
+               $controller = '\\' . $this->request->getCollection() . 'Controller';
+               if(! class_exists($controller)) {
+                  $controller = '\\artnum\HTTPController';
+               }
+               try {
+                  $controller = new $controller($model, NULL);
+               } catch(Exception $e) {
+                  $this->fail($e->geMessage());
+               }
+         
+               try {
+                  $action = strtolower($this->request->getVerb()) . 'Action';
+                  $results = $controller->$action($this->request);
+                  if(! $results) {
+                     $results = array(); 
+                  }
+                  switch(strtolower($this->request->getVerb())) {
+                     default:
+                        file_put_contents('php://output', 
+                              json_encode(array('type' => 'results', 'data' => $results)));
+                        break;
+                     case 'head':
+                        foreach($results as $k => $v) {
+                           header('X-Artnum-' . $k . ': ' . $v);
+                        }
+                        break;
+                  }
+               } catch(Exception $e) {
+                  $this->fail($e->getMessage());
+               }
+            } else {
+               $this->fail('Store doesn\'t exist');
+            }
          }
       } else {
          $this->fail('Collection not valid');
       }
    }
 
-   function fail($message) {
+   function fail($message, $code = 500) {
       if(!is_string($message)) {
          $message = $message->getMessage();
       }
-      \artnum\HTTP\Response::code(500); 
+      \artnum\HTTP\Response::code($code); 
       file_put_contents('php://output', '{ type: "error", message: "' . $message . '"}');
       exit(-1); 
    }

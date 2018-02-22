@@ -31,6 +31,7 @@ class JsonRequest extends Path
    public $parameters;
    public $verb;
    public $protocol;
+   public $client;
 
    function __construct()
    {
@@ -38,7 +39,12 @@ class JsonRequest extends Path
 
       $this->verb = $_SERVER['REQUEST_METHOD'];
       $this->protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
+      $this->client = $_SERVER['REMOTE_ADDR'];
       $this->parseParams();
+   }
+
+   function getClient()  {
+      return $this->client;
    }
 
    function getProtocol() {
@@ -152,10 +158,11 @@ class JsonRequest extends Path
       if(isset($_SERVER['QUERY_STRING'])) {
          $params = $this->_parse_str($_SERVER['QUERY_STRING']);
       }
-      
+
       $content = file_get_contents('php://input');
+      
       if($content != FALSE) {
-         if(strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
+         if(isset($_SERVER['CONTENT_TYPE']) && strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
             foreach($this->_parse_str($content) as $_k => $_v) {
                if(!empty($params[$_k])) {
                   if(is_array($params[$_k])) {

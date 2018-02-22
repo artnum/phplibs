@@ -37,7 +37,7 @@ class Path {
          if(!empty($e)) {
             $this->url_elements[] = $e;
          }
-      }    
+      } 
    }
 }
 ?>
