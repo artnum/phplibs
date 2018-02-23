@@ -119,6 +119,15 @@ class JsonRequest extends Path
          
          $name = urldecode($name);
          $value = urldecode($value);
+
+         /* Special case. When item is identified by a path ( /my/item/id ), a parameter name '!' can be used :
+               https://example.com/store/Collection/?!=/my/item/id
+          */
+         if($name == '!') {
+            $this->url_elements[] = $value;
+            continue;
+         }
+
          /* also deal with php array */
          $name = str_replace(array('[', ']'), '', $name);
 
@@ -160,7 +169,7 @@ class JsonRequest extends Path
       }
 
       $content = file_get_contents('php://input');
-      
+
       if($content != FALSE) {
          if(isset($_SERVER['CONTENT_TYPE']) && strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
             foreach($this->_parse_str($content) as $_k => $_v) {
