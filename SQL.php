@@ -65,32 +65,46 @@ class SQL {
    function delete($id) {
       $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1', 
             $this->Table, $this->IDName);
-      $st = $this->DB->prepare($pre_statement);
-      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-      $st->bindParam(':id', $id, $bind_type);
+      try {
+         $st = $this->DB->prepare($pre_statement);
+         $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+         $st->bindParam(':id', $id, $bind_type);
+      } catch (\Exception $e) {
+         return false;
+      }
       return $st->execute();
    }
 
    function get($id) {
       $pre_statement = sprintf('SELECT * FROM `%s` WHERE %s = :id', 
             $this->Table, $this->IDName);
-      $st = $this->DB->prepare($pre_statement);
-      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-      $st->bindParam(':id', $id, $bind_type);
-      if($st->execute()) {
-         $data = $st->fetch(\PDO::FETCH_ASSOC);
-         if($data != FALSE) {
-            return $data;
+      try {
+         $st = $this->DB->prepare($pre_statement);
+         $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+         $st->bindParam(':id', $id, $bind_type);
+         if($st->execute()) {
+            $data = $st->fetch(\PDO::FETCH_ASSOC);
+            if($data != FALSE) {
+               return $data;
+            }
          }
+      } catch (\Exception $e) {
+         return NULL;
       }
+
       return NULL;
    }
 
    function getLastId($params) {
       $pre_statement = sprintf('SELECT MAX(`%s`) FROM `%s`', $this->IDName, $this->Table);
-      $st = $this->DB->prepare($pre_statement);
-      if($st->execute()) {
-         return $st->fetch(\PDO::FETCH_NUM)[0];
+
+      try {
+         $st = $this->DB->prepare($pre_statement);
+         if($st->execute()) {
+            return $st->fetch(\PDO::FETCH_NUM)[0];
+         }
+      } catch (\Exception $e) {
+         return '0';
       }
 
       return '0';
@@ -99,9 +113,13 @@ class SQL {
    function getTableLastMod() {
       if($this->conf('mtime')) {
          $pre_statement = sprintf('SELECT MAX(`%s`) FROM `%s`', $this->conf('mtime'), $this->Table);
-         $st = $this->DB->prepare($pre_statement);
-         if($st->execute()) {
-            return $st->fetch(\PDO::FETCH_NUM)[0];
+         try {
+            $st = $this->DB->prepare($pre_statement);
+            if($st->execute()) {
+               return $st->fetch(\PDO::FETCH_NUM)[0];
+            }
+         } catch( \Exception $e) {
+            return '0';
          }
       }
 
@@ -112,13 +130,18 @@ class SQL {
    function getLastMod($item) {
       if(!is_null($this->conf('mtime'))) {
          $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE `%s` = :id', $this->conf('mtime'), $this->Table, $this->IDName);
-         $st = $this->DB->prepare($pre_statement);
-         if($st) {
-            $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-            $st->bindParam(':id', $item, $bind_type);
-            if($st->execute()) {
-               return $st->fetch(\PDO::FETCH_NUM)[0];
+         
+         try {
+            $st = $this->DB->prepare($pre_statement);
+            if($st) {
+               $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+               $st->bindParam(':id', $item, $bind_type);
+               if($st->execute()) {
+                  return $st->fetch(\PDO::FETCH_NUM)[0];
+               }
             }
+         } catch (\Exception $e) {
+            return '0';   
          }
       }
       return '0';
@@ -227,16 +250,21 @@ class SQL {
       if(isset($options['limit']) && ! empty($options['limit'])) { 
          $pre_statement .= ' ' . $this->prepareLimit($options['limit']);
       }
-      
-      $st = $this->DB->prepare($pre_statement);
-      if($st->execute()) {
-         $data = $st->fetchAll(\PDO::FETCH_ASSOC);
-         $return = array();
-         foreach($data as $d) {
-            $return[] = $this->read($d[$this->IDName])[0];
+     
+      try { 
+         $st = $this->DB->prepare($pre_statement);
+         if($st->execute()) {
+            $data = $st->fetchAll(\PDO::FETCH_ASSOC);
+            $return = array();
+            foreach($data as $d) {
+               $return[] = $this->read($d[$this->IDName])[0];
+            }
+            return $return;
          }
-         return $return;
+      } catch(\Exception $e) {
+         return NULL;
       }
+
       return NULL;
    }
 
@@ -256,14 +284,20 @@ class SQL {
    function exists($id) {
       $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE %s = :id',
             $this->IDName, $this->Table, $this->IDName);
-      $st = $this->DB->prepare($pre_statement);
-      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-      $st->bindParam(':id', $id, $bind_type);
-      if($st->execute()) {
-         if($st->rowCount()==1) {
-            return TRUE;
+      
+      try {
+         $st = $this->DB->prepare($pre_statement);
+         $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+         $st->bindParam(':id', $id, $bind_type);
+         if($st->execute()) {
+            if($st->rowCount()==1) {
+               return TRUE;
+            }
          }
+      } catch(\Exception $e) {
+         return FALSE;
       }
+
       return FALSE;
    }
 
@@ -285,30 +319,40 @@ class SQL {
 
       $pre_statement = sprintf('INSERT INTO `%s` ( %s ) VALUES ( %s )',
             $this->Table, $columns_txt, $values_txt);
-      $st = $this->DB->prepare($pre_statement);
-      foreach($data as $k_data => &$v_data) {
-         $bind_type = \PDO::PARAM_STR;
-         if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
-         else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
-         else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
 
-         $st->bindParam(':' . $k_data, $v_data, $bind_type);
-      }
-      if($this->conf('auto-increment')) {
-         $this->DB->beginTransaction();
-      }
+      try {
+         $st = $this->DB->prepare($pre_statement);
+         foreach($data as $k_data => &$v_data) {
+            $bind_type = \PDO::PARAM_STR;
+            if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
+            else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
+            else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
 
-      if(! $st->execute()) {
-         throw new \Exception('DB Write failed');
-      }
-     
+            $st->bindParam(':' . $k_data, $v_data, $bind_type);
+         }
 
-      if($this->conf('auto-increment')) {
-         $idx = $this->DB->lastInsertId();
-         $this->DB->commit();
-         return $idx;
-      } else {
-         return $data[$this->IDName];
+         $transaction = false;
+         if($this->conf('auto-increment')) {
+            $this->DB->beginTransaction();
+            $transaction = true;
+         }
+
+         if(! $st->execute()) {
+            if($transaction) {
+               $this->DB->rollback();
+            }
+
+            return FALSE;
+         }
+         if($this->conf('auto-increment')) {
+            $idx = $this->DB->lastInsertId();
+            $this->DB->commit();
+            return $idx;
+         } else {
+            return $data[$this->IDName];
+         }
+      } catch (\Exception $e) {
+         return FALSE;      
       }
    }
    
@@ -331,22 +375,26 @@ class SQL {
       
       $pre_statement = sprintf('UPDATE `%s` SET %s WHERE %s = :%s LIMIT 1',
             $this->Table, $columns_values_txt, $this->IDName, $this->IDName);
-      $st = $this->DB->prepare($pre_statement);
-      foreach($data as $k_data => &$v_data) {
-         $bind_type = \PDO::PARAM_STR;
-         if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
-         else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
-         else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
+      try {
+         $st = $this->DB->prepare($pre_statement);
+         foreach($data as $k_data => &$v_data) {
+            $bind_type = \PDO::PARAM_STR;
+            if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
+            else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
+            else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
 
-         $st->bindParam(':' . $k_data, $v_data, $bind_type);
-      }
-      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-      $st->bindParam(':' . $this->IDName, $id, $bind_type);
-      $ex = $st->execute();
-      if(! $ex) {
+            $st->bindParam(':' . $k_data, $v_data, $bind_type);
+         }
+         $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+         $st->bindParam(':' . $this->IDName, $id, $bind_type);
+         $ex = $st->execute();
+         if(! $ex) {
+            return FALSE;
+         }
+         return $id;
+      } catch(\Exception $e) {
          return FALSE;
       }
-      return $id;
    }
 
    function write($data) {
