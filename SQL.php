@@ -257,7 +257,7 @@ class SQL {
             $data = $st->fetchAll(\PDO::FETCH_ASSOC);
             $return = array();
             foreach($data as $d) {
-               $return[] = $this->read($d[$this->IDName])[0];
+               $return[] = $this->unprefix($this->get($d[$this->IDName]));
             }
             return $return;
          }
@@ -268,15 +268,20 @@ class SQL {
       return NULL;
    }
 
+   function unprefix($entry) {
+      $unprefixed = array();
+      foreach($entry as $k => $v) {
+         $k = explode('_', $k, 2);
+         $unprefixed[$k[1]] = $v;
+      }
+
+      return $unprefixed;
+   }
+
    function read($id) {
       $entry = $this->get($id);
       if($entry) {
-         $e = array();
-         foreach($entry as $k => $v) {
-            $k = explode('_', $k);
-            $e[$k[1]] = $v;
-         }
-         return array($e);
+         return $this->unprefix($entry);
       }
       return array();
    }
