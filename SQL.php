@@ -235,22 +235,26 @@ class SQL {
       return '';
    }
 
-   function listing($options) {
-      $pre_statement = sprintf('SELECT `%s` FROM `%s`', 
-            $this->IDName, $this->Table);
-
+   function prepare_statement($statement, $options) {
       if(isset($options['search']) && ! empty($options['search'])) {
-         $pre_statement .= ' ' . $this->prepareSearch($options['search']);
+         $statement .= ' ' . $this->prepareSearch($options['search']);
       }
 
       if(isset($options['sort']) && ! empty($options['sort'])) {
-         $pre_statement .= ' ' . $this->prepareSort($options['sort']);
+         $statement .= ' ' . $this->prepareSort($options['sort']);
       }
      
       if(isset($options['limit']) && ! empty($options['limit'])) { 
-         $pre_statement .= ' ' . $this->prepareLimit($options['limit']);
+         $statement .= ' ' . $this->prepareLimit($options['limit']);
       }
-     
+
+      return $statement;
+   }
+
+   function listing($options) {
+      $pre_statement = $this->prepare_statement(sprintf('SELECT `%s` FROM `%s`', 
+            $this->IDName, $this->Table), $options);
+
       try { 
          $st = $this->DB->prepare($pre_statement);
          if($st->execute()) {
