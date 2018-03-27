@@ -171,13 +171,9 @@ class Generic {
                      $results = array(); 
                   }
                   switch(strtolower($this->request->getVerb())) {
-                  default:
-                        header('Content-Encoding: gzip');
+                     default:
                         file_put_contents('php://output', 
-                           gzencode( 
-                              json_encode(array('type' => 'results', 'data' => $results))
-                           )
-                        );
+                              json_encode(array('type' => 'results', 'data' => $results)));
                         break;
                      case 'head':
                         foreach($results as $k => $v) {
