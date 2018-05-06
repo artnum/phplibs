@@ -47,12 +47,22 @@ class HTTPController
    }
 
    function getAction($req) {
+      $run = 0;
       try {
-         if($req->onCollection()) {
-            return $this->Model->listing($req->getParameters());
-         } else if($req->onItem()) {
-            return $this->Model->read($req->getItem());
-         }
+         do {
+            $continue = false;
+            if($req->onCollection()) {
+               $results = $this->Model->listing($req->getParameters());
+            } else if($req->onItem()) {
+               $results = $this->Model->read($req->getItem());
+            }
+            if($run < 15 && $req->getParameter('long') && count($results) == 0) {
+               $continue = true;
+               sleep(1);
+               $run++;
+            }
+         } while($continue);
+         return $results;
       } catch(Exception $e) {
          return array('success' => false, 'msg' => $e->getMessage()); 
       }
