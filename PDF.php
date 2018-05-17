@@ -32,6 +32,7 @@ class PDF extends \tFPDF {
    protected $doc = array();
    protected $tabs = array();
    protected $vtabs = array();
+   protected $nvtabs = array();
    protected $current_align = 'left';
    protected $tabbed_align = false;
    protected $current_line_max = 0;
@@ -107,12 +108,22 @@ class PDF extends \tFPDF {
       $this->tabbed_align = true;
    }
 
-   function addVTab($mm) {
-      $this->vtabs[] = $mm;
+   function addVTab($mm, $name = null) {
+      if($name == NULL) {
+         $this->vtabs[] = $mm;
+      } else {
+         $this->vtabs[] = $mm;
+         $this->nvtabs[$name] = $mm;
+      }
+
    }
 
    function vtab($i) {
-      $this->SetY($this->vtabs[$i-1] + $this->tMargin);
+      if(is_numeric($i)) {
+         $this->SetY($this->vtabs[$i-1] + $this->tMargin);
+      } else {
+         $this->SetY($this->nvtabs[$i] + $this->tMargin);
+      }
    }
 
    function vspace($mm) {
