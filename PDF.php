@@ -199,7 +199,7 @@ class PDF extends \tFPDF {
             $this->Cell($width, $height, $txt);
             break;
          case 'right':
-            $this->SetX($this->getX() - $width);
+            $this->SetX($this->w - ($this->rMargin + $width));
             $this->Cell($width, $height, $txt);
             break;
          case 'center':
