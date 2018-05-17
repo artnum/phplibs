@@ -151,7 +151,6 @@ class PDF extends \tFPDF {
 
       $height = $this->getFontSize();
       $width = $this->GetStringWidth($txt);
-      $underline_start = $this->GetX();
 
       if($width > $max_width) {
          $fromX = $this->GetX();
@@ -196,15 +195,19 @@ class PDF extends \tFPDF {
       switch($align) {
          default:
          case 'left':
+            $underline_start = $this->GetX();
             $this->Cell($width, $height, $txt);
             break;
          case 'right':
             $this->SetX($this->w - ($this->rMargin + $width));
+            $underline_start = $this->GetX();
             $this->Cell($width, $height, $txt);
             break;
          case 'center':
             break;
       }
+      
+      
       if($underline) {
          $underline_height = $this->GetY() + $height + 0.5;
          $this->Line($underline_start + $this->cMargin, $underline_height, $underline_start + $width + $this->cMargin, $underline_height);
