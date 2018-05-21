@@ -275,8 +275,12 @@ class SQL {
    function unprefix($entry) {
       $unprefixed = array();
       foreach($entry as $k => $v) {
-         $k = explode('_', $k, 2);
-         $unprefixed[$k[1]] = $v;
+         $s = explode('_', $k, 2);
+         if(count($s) <= 1) {
+            $unprefixed[$k] = $v;
+         } else {
+            $unprefixed[$s[1]] = $v;
+         }
       }
 
       return $unprefixed;

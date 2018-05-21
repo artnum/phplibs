@@ -72,18 +72,20 @@ class LDAP  {
       $c = $this->DB->readable();
       $entry = $this->get(rawurldecode($dn));
       if($entry) {
+         $_ber = null;
          $dn = ldap_get_dn($c, $entry);
          $dn = ldap_explode_dn($dn, 0);
          $ret = array('IDent' => rawurlencode($dn[0]));
-         foreach($this->Attribute as $attr) {
-            $value = ldap_get_values($c, $entry, $attr);
-            if($value) {
-               if($value['count'] == 1) {
-                  $value = $value[0];
-               } else {
-                  unset($value['count']);
+         for($attr = ldap_first_attribute($c, $entry, $_ber); $attr !== FALSE; $attr = ldap_next_attribute($c, $entry, $_ber)) {
+            if(in_array($attr, $this->Attribute)) {
+               if(($value = ldap_get_values($c, $entry, $attr)) !== FALSE) {
+                  if($value['count'] == 1) {
+                     $value = $value[0];
+                  } else {
+                     unset($value['count']);
+                  }
+                  $ret[$attr] = $value;
                }
-               $ret[$attr] = $value;
             }
          }
          return array($ret);
