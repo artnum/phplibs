@@ -93,12 +93,27 @@ class Generic {
 
    function _db($m) {
       $type = $m->dbtype();
-      if(isset($this->dbs[$type])) {
-         if(count($this->dbs[$type]) == 1) {
-            return $this->dbs[$type][0];
-         } else {
-            return $this->dbs[$type][rand(0, count($this->dbs[$type]) - 1)];
+      if(!is_array($type)) {
+         if(isset($this->dbs[$type])) {
+            if(count($this->dbs[$type]) == 1) {
+               return $this->dbs[$type][0];
+            } else {
+               return $this->dbs[$type][rand(0, count($this->dbs[$type]) - 1)];
+            }
          }
+      } else {
+         $dbs = array();
+         foreach($type as $t) {
+            if(isset($this->dbs[$t])) {
+               if(count($this->dbs[$t]) == 1) {
+                  $dbs[$t] = $this->dbs[$t][0];
+               } else {
+                  $dbs[$t] = $this->dbs[$t][rand(0, count($this->dbs[$t]) - 1)];
+               }
+            }
+         }
+
+         return $dbs;
       }
 
       return NULL;
