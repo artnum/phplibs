@@ -180,6 +180,7 @@ class Generic {
                }
          
                try {
+                  $this->session->close();
                   $action = strtolower($this->request->getVerb()) . 'Action';
                   $results = $controller->$action($this->request);
                   if(! $results) {

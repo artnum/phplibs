@@ -62,6 +62,10 @@ class Session {
    function has($name) {
       return isset($_SESSION[$name]);
    }
+
+   function close() {
+      session_write_close();
+   }
 }
 
 ?>
