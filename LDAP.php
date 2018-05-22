@@ -36,8 +36,23 @@ class LDAP  {
    function __construct($db, $suffix, $attributes, $config) {
       $this->DB = $db;
       $this->Suffix = $suffix;
-      $this->Attribute = $attributes;
       $this->Config = $config;
+      $this->Binary = array();
+
+      if(is_array($this->Config['binary'])) {
+         foreach($this->Config['binary'] as $b) {
+            array_push($this->Binary, strtolower($b));
+         }
+      }
+
+      if(is_array($attributes)) {
+         $this->Attribute = array();
+         foreach($attributes as $attr) {
+            array_push($this->Attribute, strtolower($attr));
+         }
+      } else {
+         $this->Attribute = NULL;
+      }
    }
 
    function dbtype() {
@@ -77,8 +92,22 @@ class LDAP  {
          $dn = ldap_explode_dn($dn, 0);
          $ret = array('IDent' => rawurlencode($dn[0]));
          for($attr = ldap_first_attribute($c, $entry, $_ber); $attr !== FALSE; $attr = ldap_next_attribute($c, $entry, $_ber)) {
-            if(in_array($attr, $this->Attribute)) {
-               if(($value = ldap_get_values($c, $entry, $attr)) !== FALSE) {
+            $attr = strtolower($attr); $keep = true;
+            if(! is_null($this->Attribute) && ! in_array($attr, $this->Attribute)) {
+               $keep == false;
+            }
+            if($keep) {
+               $value = FALSE;
+               if(in_array($attr, $this->Binary)) {
+                  $value = ldap_get_values_len($c, $entry, $attr);
+                  for($i = 0; $i < $value['count']; $i++) {
+                     $value[$i] = base64_encode($value[$i]);
+                  }
+               } else {
+                  $value = ldap_get_values($c, $entry, $attr);
+               }
+
+               if($value !== FALSE) {
                   if($value['count'] == 1) {
                      $value = $value[0];
                   } else {
@@ -111,6 +140,9 @@ class LDAP  {
 
    function prepareSearch($searches) {
       $op = ''; $s = 0; $filter='';
+      if(! is_array($searches)) {
+         return '(objectclass=*)';
+      }
       foreach($searches as $name => $terms) {
          if($name[0] == '_') { continue; }
          if(!is_array($terms)) {
@@ -178,8 +210,10 @@ class LDAP  {
       $c = $this->DB->readable();
       if(isset($options['search'])) {
             $filter = $this->prepareSearch($options['search']);
+      } else {
+         $filter = '(objectclass=*)';
       }
-      $res = ldap_list($c, $this->_dn(), $this->prepareSearch($options['search']), array('dn'));
+      $res = ldap_list($c, $this->_dn(), $filter, array('dn'));
       $ret = array();
       if($res) {
          for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
