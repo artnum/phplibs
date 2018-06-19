@@ -440,7 +440,7 @@ class SQL {
    function _datetime ($value) {
       if (!is_string($value)) { return $value; }
       if (is_null($value) || empty($value)) { return $value; }
-
+      if (is_numeric($value)) { $value = '@'. $value; }
       try {
          $dt = new \DateTime($value);
          $dt->setTimeZone(new \DateTimeZone('UTC'));
