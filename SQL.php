@@ -63,16 +63,30 @@ class SQL {
    }
 
    function delete($id) {
-      $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1', 
+      if (!$this->conf('delete')) {
+         $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1', 
             $this->Table, $this->IDName);
-      try {
-         $st = $this->DB->prepare($pre_statement);
-         $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-         $st->bindParam(':id', $id, $bind_type);
-      } catch (\Exception $e) {
-         return false;
+         try {
+            $st = $this->DB->prepare($pre_statement);
+            $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+            $st->bindParam(':id', $id, $bind_type);
+         } catch (\Exception $e) {
+            return false;
+         }
+         return $st->execute();
+      } else {
+         if (!$this->conf('delete.ts')) {
+            $now = new \DateTime('now', new \DateTimeZone('UTC')); $now = $now->format('c');
+         } else {
+            $now = time();
+         }
+
+         try {
+            return $this->update(array($this->IDName => $id, $this->conf('delete') => $now)) ? TRUE : FALSE;
+         } catch (\Exception $e) {
+            return FALSE;
+         }
       }
-      return $st->execute();
    }
 
    function get($id) {
