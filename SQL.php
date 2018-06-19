@@ -275,7 +275,8 @@ class SQL {
             $data = $st->fetchAll(\PDO::FETCH_ASSOC);
             $return = array();
             foreach($data as $d) {
-               $return[] = $this->unprefix($this->get($d[$this->IDName]));
+               $x = $this->unprefix($this->get($d[$this->IDName]));
+               $return[] = $this->_postprocess($x);
             }
             return $return;
          }
@@ -300,10 +301,22 @@ class SQL {
       return $unprefixed;
    }
 
+   function _postprocess ($entry) {
+      $dt = $this->conf('datetime');
+      foreach ($entry as $k => $v) {
+         if (is_array($dt) && in_array($k, $dt)) {
+            $entry[$k] = $this->_datetime($v);
+         }
+      }
+
+      return $entry;
+   }
+
    function read($id) {
       $entry = $this->get($id);
       if($entry) {
-         return $this->unprefix($entry);
+         $unprefixed = $this->unprefix($entry);
+         return $this->_postprocess($unprefixed);
       }
       return array();
    }
@@ -421,6 +434,26 @@ class SQL {
          return $id;
       } catch(\Exception $e) {
          return FALSE;
+      }
+   }
+
+   function _datetime ($value) {
+      if (!is_string($value)) { return $value; }
+      if (is_null($value) || empty($value)) { return $value; }
+
+      try {
+         $dt = new \DateTime($value);
+         $dt->setTimeZone(new \DateTimeZone('UTC'));
+         $value = $dt->format('c');
+         $ret = preg_replace('/\+[0:]+$/', 'Z', $value);
+         if(!is_null($ret)) {
+            return $ret;
+         } else {
+            return $value;
+         }
+      } catch (\Exception $e) {
+         /* return value if cannot be parsed */
+         return $value;
       }
    }
 
