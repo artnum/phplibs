@@ -176,10 +176,8 @@ class PDF extends \tFPDF {
                         if(isset($options['break']) && !$options['break']) {
                            $options['break'] = true;
                         }
-
-                        $this->printLn($sub, $options);
-                        $this->SetX($fromX);
-                        $sub = '';
+                        $txt = $sub;
+                        break;
                      }
 
                      if($sub == '') {
@@ -188,19 +186,19 @@ class PDF extends \tFPDF {
                         $sub .= ' ' . $ttxt[$i];
                      }
                   }
-                  if($sub != '' && !empty($sub)) {
-                     $txt = $sub;
-                     $width = $this->GetStringWidth($txt);
-                     break;
-                  } else {
-                     return;
+               } else {
+                  $sub = '';
+                  for($i = 0; $i < strlen($txt); $i++) {
+                     if($this->GetStringWidth($sub . $txt[$i]) > $max_width) {
+                        $txt = $sub; break;
+                     }
+                     $sub .= $txt[$i];
                   }
                }
                break;
             case 'right':
                break;
          }
-
       }
 
       switch($align) {
