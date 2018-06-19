@@ -418,9 +418,12 @@ class SQL {
       }
 
       if(!is_null($this->conf('mtime'))) {
-         $now = new \DateTime('now', new \DateTimeZone('UTC')); $now = $now->format('c');
-         $prefixed[$this->conf('mtime')] = $now;
-         
+         if (!$this->conf('mtime.ts')) {
+            $now = new \DateTime('now', new \DateTimeZone('UTC')); $now = $now->format('c');
+            $prefixed[$this->conf('mtime')] = $now;
+         } else {
+            $prefixed[$this->conf('mtime')] = time();
+         }
       }
 
       if(!isset($prefixed[$this->IDName]) || empty($prefixed[$this->IDName])) {
