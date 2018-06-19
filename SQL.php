@@ -124,13 +124,27 @@ class SQL {
       return '0';
    }
 
+   function _timestamp ($date) {
+      $val = $date;
+      if (is_null($date)) { return 0; }
+      if (empty($date)) { return 0; }
+      if (is_numeric($date)) { $val = '@' . $date; }
+
+      try {
+         $val = new DateTime($val);
+         return $val->getTimestamp();
+      } catch(\Exception $e) {
+         return 0;
+      }
+   }
+
    function getTableLastMod() {
       if($this->conf('mtime')) {
          $pre_statement = sprintf('SELECT MAX(`%s`) FROM `%s`', $this->conf('mtime'), $this->Table);
          try {
             $st = $this->DB->prepare($pre_statement);
             if($st->execute()) {
-               return $st->fetch(\PDO::FETCH_NUM)[0];
+               return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
             }
          } catch( \Exception $e) {
             return '0';
@@ -151,7 +165,7 @@ class SQL {
                $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
                $st->bindParam(':id', $item, $bind_type);
                if($st->execute()) {
-                  return $st->fetch(\PDO::FETCH_NUM)[0];
+                  return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
                }
             }
          } catch (\Exception $e) {
