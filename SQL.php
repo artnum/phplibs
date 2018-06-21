@@ -75,14 +75,22 @@ class SQL {
          }
          return $st->execute();
       } else {
+         $now = time();
+         $data = array($this->IDName => $id);
          if (!$this->conf('delete.ts')) {
-            $now = new \DateTime('now', new \DateTimeZone('UTC')); $now = $now->format('c');
+            $data[$this->conf('delete')] = new \DateTime('@' . $now, new \DateTimeZone('UTC')); $now = $now->format('c');
          } else {
-            $now = time();
+            $data[$this->conf('delete')] = $now; 
          }
-
+         if($this->conf('mtime')) {
+            if (!$this->conf('mtime.ts')) {
+               $data[$this->conf('mtime')] = new \DateTime('@' . $now, new \DateTimeZone('UTC')); $now = $now->format('c');
+            } else {
+               $data[$this->conf('mtime')] = $now;
+            }
+         }
          try {
-            return $this->update(array($this->IDName => $id, $this->conf('delete') => $now)) ? TRUE : FALSE;
+            return $this->update($data) ? TRUE : FALSE;
          } catch (\Exception $e) {
             return FALSE;
          }
