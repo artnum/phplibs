@@ -495,6 +495,11 @@ class SQL {
          }
       }
 
+      /* Write to an item undelete it, except if specified no to do so */
+      if (!is_null($this->conf('delete')) && !$this->conf('delete.no-auto-undelete')) {
+         $prefixed[$this->conf('delete')] = NULL;
+      }
+
       if(!isset($prefixed[$this->IDName]) || empty($prefixed[$this->IDName])) {
          return $this->create($prefixed);
       } else {
