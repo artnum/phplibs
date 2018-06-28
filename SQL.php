@@ -139,7 +139,7 @@ class SQL {
       if (is_numeric($date)) { $val = '@' . $date; }
 
       try {
-         $val = new DateTime($val);
+         $val = new \DateTime($val);
          return $val->getTimestamp();
       } catch(\Exception $e) {
          return 0;
