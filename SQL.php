@@ -368,15 +368,15 @@ class SQL {
    function exists($id) {
       $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE %s = :id',
             $this->IDName, $this->Table, $this->IDName);
-      
       try {
          $st = $this->DB->prepare($pre_statement);
          $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
          $st->bindParam(':id', $id, $bind_type);
          if($st->execute()) {
-            if($st->rowCount()==1) {
+            if($st->fetch()) {
                return TRUE;
             }
+         } else {
          }
       } catch(\Exception $e) {
          return FALSE;
