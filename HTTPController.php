@@ -39,7 +39,8 @@ class HTTPController
          if($req->onCollection()) {
             return array('last-id' => $this->Model->getLastId($req->getParameters()), 'last-modification' => $this->Model->getTableLastMod());
          } else if($req->onItem()) {
-            return array('last-modification' => $this->Model->getLastMod($req->getItem()));
+            return array('last-modification' => $this->Model->getLastMod($req->getItem()),
+               'deleted' => $this->Model->getDeleteDate($req->getItem()));
          }
       } catch(Exception $e) {
          return array('error' => $e->getMessage());

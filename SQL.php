@@ -163,6 +163,25 @@ class SQL {
 
    }
 
+   function getDeleteDate($item) {
+      if (!is_null($this->conf('delete'))) {
+         $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE `%s` = :id', $this->conf('delete'), $this->Table, $this->IDName);
+         try {
+            if ($st) {
+               $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+               $st->bindParam(':id', $item, $bind_type);
+               if($st->execute()) {
+                  return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
+               }
+            }
+         } catch(\Exception $e) {
+            return '0';
+         }
+      } else {
+         return '0';
+      }
+   }
+
    function getLastMod($item) {
       if(!is_null($this->conf('mtime'))) {
          $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE `%s` = :id', $this->conf('mtime'), $this->Table, $this->IDName);
