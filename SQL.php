@@ -164,6 +164,9 @@ class SQL {
    }
 
    function getDeleteDate($item) {
+      if (!$this->exists($item)) {
+         return '1';
+      }
       if (!is_null($this->conf('delete'))) {
          $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE `%s` = :id', $this->conf('delete'), $this->Table, $this->IDName);
          try {
