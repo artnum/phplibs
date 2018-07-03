@@ -64,7 +64,7 @@ class SQL {
 
    function delete($id) {
       if (!$this->conf('delete')) {
-         $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1', 
+         $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1',
             $this->Table, $this->IDName);
          try {
             $st = $this->DB->prepare($pre_statement);
@@ -95,6 +95,33 @@ class SQL {
             return FALSE;
          }
       }
+   }
+
+   function readMultiple ($ids) {
+      if (! ctype_digit($ids[0])) {
+         for ($i = 0; $i < count($ids); $i++) {
+            $ids[$i] = '\'' . $ids[$i] . '\'';
+         }
+      }
+      $pre_statement = sprintf('SELECT * FROM `%s` WHERE %s IN (%s)',
+         $this->Table, $this->IDName, implode(',', $ids));
+      try {
+         $st = $this->DB->prepare($pre_statement);
+         $data = array();
+         if ($st->execute()) {
+            while (($row = $st->fetch(\PDO::FETCH_ASSOC))) {
+               $row = $this->unprefix($row);
+               $row = $this->_postprocess($row);
+               $data[] = $row;
+            }
+
+            return $data;
+         }
+      } catch(\Exception $e) {
+         return NULL;
+      }
+
+      return NULL;
    }
 
    function get($id) {

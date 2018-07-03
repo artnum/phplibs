@@ -55,7 +55,18 @@ class HTTPController
             if($req->onCollection()) {
                $results = $this->Model->listing($req->getParameters());
             } else if($req->onItem()) {
-               $results = $this->Model->read($req->getItem());
+               if (!$req->multiple) {
+                  $results = $this->Model->read($req->getItem());
+               } else {
+                  if (method_exists($this->Model, 'readMultiple')) {
+                     $results = $this->Model->readMultiple($req->getItem());
+                  } else {
+                     $results = array();
+                     foreach ($req->getItem() as $item) {
+                        $results[] = $this->Model->read($item);
+                     }
+                  }
+               }
             }
             if($run < 15 && $req->getParameter('long') && count($results) == 0) {
                $continue = true;

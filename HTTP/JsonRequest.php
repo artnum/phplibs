@@ -32,15 +32,25 @@ class JsonRequest extends Path
    public $verb;
    public $protocol;
    public $client;
+   public $multiple;
+   public $items;
 
    function __construct()
    {
       parent::__construct();
-
+      $this->multiple = false;
+      $this->items = array();
       $this->verb = $_SERVER['REQUEST_METHOD'];
       $this->protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
       $this->client = $_SERVER['REMOTE_ADDR'];
       $this->parseParams();
+
+      if ($this->onItem()) {
+         if ($this->getItem()[0] == '|') {
+            $this->items = explode('|', substr($this->getItem(), 1));
+            $this->multiple = true;
+         }
+      }
    }
 
    function getClient()  {
@@ -67,7 +77,13 @@ class JsonRequest extends Path
    }
 
    function getItem() {
-      if($this->onItem()) return $this->url_elements[1];
+      if ($this->onItem()) {
+         if ($this->multiple) {
+            return $this->items;
+         } else {
+            return $this->url_elements[1];
+         }
+      }
       return NULL; 
    }
 
