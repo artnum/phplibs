@@ -82,6 +82,23 @@ class PDF extends \tFPDF {
       }
    }
 
+   /* Set position on the page relative to margins. Top - left corner is 0, 0. Only positive value */
+   function setPosition ($x = -1, $y = -1) {
+      if ($x < 0) {
+         $x = $this->GetX();
+      } else {
+         $x += $this->lMargin;
+      }
+
+      if ($y < 0) {
+         $y = $this->GetY();
+      } else {
+         $y += $this->tMargin;
+      }
+
+      $this->SetXY($x, $y);
+   }
+
    function set($name, $content) {
       $this->doc[$name] = $content;
    }
@@ -132,17 +149,35 @@ class PDF extends \tFPDF {
 
    function printTaggedLn($txt, $options = array()) {
       $break = isset($options['break']) ? $options['break'] : true;
-      foreach($txt as $t) {
-         if($t[0] == '%') {
-            if(isset($this->tagged_fonts[substr($t, 1)])) {
-               $this->setTaggedFont(substr($t, 1));
+      if (isset($options['align']) && strcasecmp($options['align'], 'right') == 0) {
+         $txt = array_reverse($txt);
+         $this->SetX($this->w - $this->rMargin);
+         foreach($txt as $t) {
+            if ($t[0] == '%') {
+               if (isset($this->tagged_fonts[substr($t, 1)])) {
+                  $this->setTaggedFont(substr($t, 1));
+                  continue;
+               }
+            }
+            $txtWidth = $this->GetStringWidth($t);
+            $this->SetX($this->GetX() - $txtWidth);
+            $o = $options; $o['break'] = false; $o['align'] = 'left';
+            $this->printLn($t, $o);
+            $this->SetX($this->GetX() - $txtWidth);
+         }
+      } else {
+         foreach($txt as $t) {
+            if($t[0] == '%') {
+               if(isset($this->tagged_fonts[substr($t, 1)])) {
+                  $this->setTaggedFont(substr($t, 1));
+               } else {
+                  $o = $options; $o['break'] = false;
+                  $this->printLn($t, $o);
+               }
             } else {
                $o = $options; $o['break'] = false;
                $this->printLn($t, $o);
             }
-         } else {
-            $o = $options; $o['break'] = false;
-            $this->printLn($t, $o);
          }
       }
        
