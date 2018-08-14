@@ -64,19 +64,25 @@ class LDAP  {
    }
 
    function _dn($dn = NULL) {
+      $ret = NULL;
       if(!is_null($this->Suffix)) {
          if(empty($dn) || is_null($dn)) {
-            return $this->Suffix;
+            $ret = $this->Suffix;
+         } else {
+            $ret = $dn . ',' . $this->Suffix;
          }
-         return $dn . ',' . $this->Suffix;      
       }
 
-      return $dn;
+      if ($ret != NULL) {
+         return $ret;
+      }
+
+      return NULL;
    }
 
    function get($dn) {
       $c = $this->DB->readable();
-      $res = ldap_read($c, $this->_dn($dn), '(objectclass=*)', $this->Attribute);
+      $res = @ldap_read($c, $this->_dn($dn), '(objectclass=*)', $this->Attribute);
       if($res && ldap_count_entries($c, $res) == 1) {
          return ldap_first_entry($c, $res);
       }
