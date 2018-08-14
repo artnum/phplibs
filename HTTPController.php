@@ -101,6 +101,10 @@ class HTTPController
       }
    }
 
+   function patchAction ($req) {
+      return $this->putAction($req);
+   }
+
    function putAction($req) {
       if(!$req->onCollection()) {
          return $this->postAction($req);      
