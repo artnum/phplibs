@@ -33,12 +33,25 @@ class SQL {
    protected $Table;
    protected $Config;
    protected $IDName;
+   protected $Request = array(
+      'delete' => 'DELETE FROM "\\Table" WHERE "\\IDName" = :id LIMIT 1',
+      'readMultiple' => 'SELECT * FROM "\\Table" WHERE "\\IDName" IN (\\IDS)',
+      'get' => 'SELECT * FROM "\\Table" WHERE "\\IDName" = :id',
+      'getLastId' => 'SELECT MAX("\\IDName") FROM "\\Table"',
+      'getTableLastMod' => 'SELECT MAX("\\mtime") FROM "\\Table"',
+      'getDeleteDate' => 'SELECT "\\delete" FROM "\\Table" WHERE "\\IDName" = :id',
+      'getLastMod' => 'SELECT "\\mtime" FROM "\\Table" WHERE "\\IDName" = :id',
+      'listing' => 'SELECT "\\IDName" FROM "\\Table"',
+      'exists' => 'SELECT "\\IDName" FROM "\\Table" WHERE "\\IDName" = :id',
+      'create' =>'INSERT INTO "\\Table" ( \\COLTXT ) VALUES ( \\VALTXT )',
+      'update' => 'UPDATE "\\Table" SET \\COLVALTXT WHERE "\\IDName" = :\\IDName LIMIT 1'
+   );
 
    function __construct($db, $table, $id_name, $config) {
       $this->DB = $db;
-      $this->Table = $table;
-      $this->IDName = $id_name;
       $this->Config = $config;
+      $this->conf('Table', $table);
+      $this->conf('IDName', $id_name);
    } 
    
    function set_db($db) {
@@ -49,8 +62,23 @@ class SQL {
       return 'sql';
    }
 
-   function conf($name, $value = null) {
-      if(is_null($value)) {
+   function conf($name, $value = NULL) {
+      if (!is_string($name)) {
+         return NULL;
+      }
+      switch (strtolower($name)) {
+         case 'idname':
+            if (!is_null($value) && is_string($value)) {
+               $this->IDName = $value;
+            }
+            return $this->IDName;
+         case 'table':
+            if (!is_null($value) && is_string($value)) {
+               $this->Table = $value;
+            }
+            return $this->Table;
+      }
+      if (is_null($value)) {
          if(isset($this->Config[$name])) {
             return $this->Config[$name];
          }
@@ -62,12 +90,50 @@ class SQL {
       return null;
    }
 
+   function set_req($name, $value) {
+      if (is_string($name) && is_string($value)) {
+         $this->Request[$name] = $value;
+      }
+   }
+
+   function req ($name, $vars = array()) {
+      if (isset($this->Request[$name])) {
+         $req = $this->Request[$name];
+         if (!preg_match_all('/\\\\[a-zA-Z]+/', $req, $matches)) {
+            return '';
+         }
+
+         if (!(count($matches[0]) > 0)) {
+            return $req;
+         }
+
+         $replaced = array();
+         foreach ($matches[0] as $var) {
+            if (in_array($var, $replaced)) {
+               continue;
+            }
+            $replaced[] = $var;
+            if ($this->conf(substr($var, 1))) {
+               $req = str_replace($var, $this->conf(substr($var, 1)), $req);
+               continue;
+            }
+
+            if($vars[substr($var, 1)]) {
+               $req = str_replace($var, $vars[substr($var, 1)], $req);
+               continue;
+            }
+         }
+
+         return $req;
+      }
+
+      return '';
+   }
+
    function delete($id) {
       if (!$this->conf('delete')) {
-         $pre_statement = sprintf('DELETE FROM `%s` WHERE %s = :id LIMIT 1',
-            $this->Table, $this->IDName);
          try {
-            $st = $this->DB->prepare($pre_statement);
+            $st = $this->DB->prepare($this->req('delete'));
             $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
             $st->bindParam(':id', $id, $bind_type);
          } catch (\Exception $e) {
@@ -103,10 +169,8 @@ class SQL {
             $ids[$i] = '\'' . $ids[$i] . '\'';
          }
       }
-      $pre_statement = sprintf('SELECT * FROM `%s` WHERE %s IN (%s)',
-         $this->Table, $this->IDName, implode(',', $ids));
       try {
-         $st = $this->DB->prepare($pre_statement);
+         $st = $this->DB->prepare($this->req('readMultiple', array('IDS' => implode(',', $ids))));
          $data = array();
          if ($st->execute()) {
             while (($row = $st->fetch(\PDO::FETCH_ASSOC))) {
@@ -125,10 +189,8 @@ class SQL {
    }
 
    function get($id) {
-      $pre_statement = sprintf('SELECT * FROM `%s` WHERE %s = :id', 
-            $this->Table, $this->IDName);
       try {
-         $st = $this->DB->prepare($pre_statement);
+         $st = $this->DB->prepare($this->req('get'));
          $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
          $st->bindParam(':id', $id, $bind_type);
          if($st->execute()) {
@@ -145,10 +207,8 @@ class SQL {
    }
 
    function getLastId($params) {
-      $pre_statement = sprintf('SELECT MAX(`%s`) FROM `%s`', $this->IDName, $this->Table);
-
       try {
-         $st = $this->DB->prepare($pre_statement);
+         $st = $this->DB->prepare($this->req('getLastId'));
          if($st->execute()) {
             return $st->fetch(\PDO::FETCH_NUM)[0];
          }
@@ -175,9 +235,8 @@ class SQL {
 
    function getTableLastMod() {
       if($this->conf('mtime')) {
-         $pre_statement = sprintf('SELECT MAX(`%s`) FROM `%s`', $this->conf('mtime'), $this->Table);
          try {
-            $st = $this->DB->prepare($pre_statement);
+            $st = $this->DB->prepare($this->req('getTableLastMod'));
             if($st->execute()) {
                return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
             }
@@ -195,8 +254,8 @@ class SQL {
          return '1';
       }
       if (!is_null($this->conf('delete'))) {
-         $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE `%s` = :id', $this->conf('delete'), $this->Table, $this->IDName);
          try {
+            $st = $this->DB->prepare($this->req('getDeleteDate'));
             if ($st) {
                $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
                $st->bindParam(':id', $item, $bind_type);
@@ -214,10 +273,8 @@ class SQL {
 
    function getLastMod($item) {
       if(!is_null($this->conf('mtime'))) {
-         $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE `%s` = :id', $this->conf('mtime'), $this->Table, $this->IDName);
-         
          try {
-            $st = $this->DB->prepare($pre_statement);
+            $st = $this->DB->prepare($this->req('getLastMod'));
             if($st) {
                $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
                $st->bindParam(':id', $item, $bind_type);
@@ -264,9 +321,9 @@ class SQL {
          }    
          $value = trim($value); 
          if($no_value) {
-            $s[$name] = $this->Table . '_' . $name  . $op;   
+            $s[$name] = $this->conf('Table') . '_' . $name  . $op;
          } else {
-            $str = $this->Table . '_' . $name . $op;
+            $str = $this->conf('Table') . '_' . $name . $op;
             if(is_numeric($value)) {
                $str .= $value;
             } else {
@@ -309,7 +366,7 @@ class SQL {
       foreach($sort as $attr => $dir) {
          $dir = strtoupper($dir);
          if($dir == 'ASC' || $dir == 'DESC') {
-            $o[] = $this->Table . '_' . $attr . ' ' . $dir;
+            $o[] = $this->conf('Table') . '_' . $attr . ' ' . $dir;
          }
       }
 
@@ -337,9 +394,7 @@ class SQL {
    }
 
    function listing($options) {
-      $pre_statement = $this->prepare_statement(sprintf('SELECT `%s` FROM `%s`', 
-            $this->IDName, $this->Table), $options);
-
+      $pre_statement = $this->prepare_statement($this->req('listing'), $options);
       try { 
          $st = $this->DB->prepare($pre_statement);
          if($st->execute()) {
@@ -358,14 +413,27 @@ class SQL {
       return NULL;
    }
 
-   function unprefix($entry) {
+   function unprefix($entry, $table = NULL) {
+      $useTable = $this->conf('Table');
+      if (!is_null($table)) {
+         $useTable = $table;
+      }
       $unprefixed = array();
       foreach($entry as $k => $v) {
          $s = explode('_', $k, 2);
          if(count($s) <= 1) {
             $unprefixed[$k] = $v;
          } else {
-            $unprefixed[$s[1]] = $v;
+            /* if the prefix is from a different table, it means we are onto join request (or alike), so create subcategory */
+            if (strcasecmp($s[0], $useTable) != 0) {
+               if (!isset($unprefixed[$s[0]])) {
+                  $unprefixed[$s[0]] = array();
+               }
+
+               $unprefixed[$s[0]][$s[1]] = $v;
+            } else {
+               $unprefixed[$s[1]] = $v;
+            }
          }
       }
 
@@ -393,10 +461,8 @@ class SQL {
    }
 
    function exists($id) {
-      $pre_statement = sprintf('SELECT `%s` FROM `%s` WHERE %s = :id',
-            $this->IDName, $this->Table, $this->IDName);
       try {
-         $st = $this->DB->prepare($pre_statement);
+         $st = $this->DB->prepare($this->req('exists'));
          $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
          $st->bindParam(':id', $id, $bind_type);
          if($st->execute()) {
@@ -428,11 +494,8 @@ class SQL {
       $columns_txt = implode(',', $columns);
       $values_txt = implode(',', $values);
 
-      $pre_statement = sprintf('INSERT INTO `%s` ( %s ) VALUES ( %s )',
-            $this->Table, $columns_txt, $values_txt);
-
       try {
-         $st = $this->DB->prepare($pre_statement);
+         $st = $this->DB->prepare($this->req('create', array('COLTXT' => $columns_txt, 'VALTXT' => $values_txt)));
          foreach($data as $k_data => &$v_data) {
             $bind_type = \PDO::PARAM_STR;
             if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
@@ -484,10 +547,8 @@ class SQL {
       }
       $columns_values_txt = implode(',', $columns_values);
       
-      $pre_statement = sprintf('UPDATE `%s` SET %s WHERE %s = :%s LIMIT 1',
-            $this->Table, $columns_values_txt, $this->IDName, $this->IDName);
       try {
-         $st = $this->DB->prepare($pre_statement);
+         $st = $this->DB->prepare($this->req('update', array('COLVALTXT' => $columns_values_txt)));
          foreach($data as $k_data => &$v_data) {
             $bind_type = \PDO::PARAM_STR;
             if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
@@ -532,7 +593,7 @@ class SQL {
       $prefixed = array();
       
       foreach($data as $k => $v) {
-         $prefixed[$this->Table . '_' . $k] = $v;
+         $prefixed[$this->conf('Table') . '_' . $k] = $v;
       }
 
       if(!is_null($this->conf('mtime'))) {
