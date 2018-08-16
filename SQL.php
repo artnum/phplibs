@@ -52,6 +52,7 @@ class SQL {
       $this->Config = $config;
       $this->conf('Table', $table);
       $this->conf('IDName', $id_name);
+      $this->DataLayer = new Data();
    } 
    
    function set_db($db) {
@@ -141,16 +142,15 @@ class SQL {
          }
          return $st->execute();
       } else {
-         $now = time();
          $data = array($this->IDName => $id);
          if (!$this->conf('delete.ts')) {
-            $data[$this->conf('delete')] = new \DateTime('@' . $now, new \DateTimeZone('UTC')); $now = $now->format('c');
+            $data[$this->conf('delete')] = $this->DataLayer->datetime(time());
          } else {
             $data[$this->conf('delete')] = $now; 
          }
          if($this->conf('mtime')) {
             if (!$this->conf('mtime.ts')) {
-               $data[$this->conf('mtime')] = new \DateTime('@' . $now, new \DateTimeZone('UTC')); $now = $now->format('c');
+               $data[$this->conf('mtime')] = $this->DataLayer->datetime(time()); 
             } else {
                $data[$this->conf('mtime')] = $now;
             }
@@ -446,7 +446,7 @@ class SQL {
       $dt = $this->conf('datetime');
       foreach ($entry as $k => $v) {
          if (is_array($dt) && in_array($k, $dt)) {
-            $entry[$k] = $this->_datetime($v);
+            $entry[$k] = $this->DataLayer->datetime($value);
          }
       }
 
@@ -571,26 +571,6 @@ class SQL {
       }
    }
 
-   function _datetime ($value) {
-      if (!is_string($value)) { return $value; }
-      if (is_null($value) || empty($value)) { return $value; }
-      if (is_numeric($value)) { $value = '@'. $value; }
-      try {
-         $dt = new \DateTime($value);
-         $dt->setTimeZone(new \DateTimeZone('UTC'));
-         $value = $dt->format('c');
-         $ret = preg_replace('/\+[0:]+$/', 'Z', $value);
-         if(!is_null($ret)) {
-            return $ret;
-         } else {
-            return $value;
-         }
-      } catch (\Exception $e) {
-         /* return value if cannot be parsed */
-         return $value;
-      }
-   }
-
    function write($data) {
       $prefixed = array();
       
@@ -600,8 +580,7 @@ class SQL {
 
       if(!is_null($this->conf('mtime'))) {
          if (!$this->conf('mtime.ts')) {
-            $now = new \DateTime('now', new \DateTimeZone('UTC')); $now = $now->format('c');
-            $prefixed[$this->conf('mtime')] = $now;
+            $prefixed[$this->conf('mtime')] = $this->DataLayer->datetime(time());
          } else {
             $prefixed[$this->conf('mtime')] = time();
          }
