@@ -294,6 +294,7 @@ class SQL {
       foreach($searches as $name => $search) {
          if($name == '_rules') { continue; }
          $value = substr($search, 1);
+         $no_value = false;
          switch($search[0]) {
             default:
                $value = $search;
@@ -320,6 +321,7 @@ class SQL {
                   break;
          }    
          $value = trim($value); 
+
          if($no_value) {
             $s[$name] = $this->conf('Table') . '_' . $name  . $op;
          } else {
