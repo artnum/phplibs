@@ -29,7 +29,7 @@ Namespace artnum;
 class Data {
    /* Convert string/datetime into ISO 8601 string, UTC with Z ending */
    function datetime ($value) {
-      if (!$value instanceof \DateTime) {
+      if (!($value instanceof \DateTime)) {
          if (is_null($value) || empty($value)) { return $value; }
          if (is_integer($value) || is_numeric($value)) { $value = '@' . strval($value); }
          if (!is_string($value)) { return $value; }
@@ -43,7 +43,7 @@ class Data {
          }
 
       }
-      $ret = preg_replace('\+[0:]+$/', 'Z', $value);
+      $ret = preg_replace('/\+[0:]+$/', 'Z', $value);
       if (!is_null($ret)) {
          return $ret;
       }

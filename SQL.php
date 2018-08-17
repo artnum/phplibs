@@ -446,7 +446,7 @@ class SQL {
       $dt = $this->conf('datetime');
       foreach ($entry as $k => $v) {
          if (is_array($dt) && in_array($k, $dt)) {
-            $entry[$k] = $this->DataLayer->datetime($value);
+            $entry[$k] = $this->DataLayer->datetime($v);
          }
       }
 
