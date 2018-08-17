@@ -152,13 +152,13 @@ class SQL {
          if (!$this->conf('delete.ts')) {
             $data[$this->conf('delete')] = $this->DataLayer->datetime(time());
          } else {
-            $data[$this->conf('delete')] = $now; 
+            $data[$this->conf('delete')] = time();
          }
          if($this->conf('mtime')) {
             if (!$this->conf('mtime.ts')) {
                $data[$this->conf('mtime')] = $this->DataLayer->datetime(time()); 
             } else {
-               $data[$this->conf('mtime')] = $now;
+               $data[$this->conf('mtime')] = time();
             }
          }
          try {
