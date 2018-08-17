@@ -49,6 +49,7 @@ class SQL {
 
    function __construct($db, $table, $id_name, $config) {
       $this->DB = $db;
+      $this->DB->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
       $this->Config = $config;
       $this->conf('Table', $table);
       $this->conf('IDName', $id_name);
