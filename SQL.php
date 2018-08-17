@@ -434,11 +434,11 @@ class SQL {
          } else {
             /* if the prefix is from a different table, it means we are onto join request (or alike), so create subcategory */
             if (strcasecmp($s[0], $useTable) != 0) {
-               if (!isset($unprefixed[$s[0]])) {
-                  $unprefixed[$s[0]] = array();
+               if (!isset($unprefixed['_' . $s[0]])) {
+                  $unprefixed['_' . $s[0]] = array();
                }
 
-               $unprefixed[$s[0]][$s[1]] = $v;
+               $unprefixed['_' . $s[0]][$s[1]] = $v;
             } else {
                $unprefixed[$s[1]] = $v;
             }
