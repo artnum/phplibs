@@ -422,6 +422,7 @@ class SQL {
    }
 
    function unprefix($entry, $table = NULL) {
+      $nullTable = array();
       $useTable = $this->conf('Table');
       if (!is_null($table)) {
          $useTable = $table;
@@ -434,14 +435,26 @@ class SQL {
          } else {
             /* if the prefix is from a different table, it means we are onto join request (or alike), so create subcategory */
             if (strcasecmp($s[0], $useTable) != 0) {
+               if (!isset($nullTable['_' . $s[0]])) {
+                  $nullTable['_' . $s[0]] = true;
+               }
                if (!isset($unprefixed['_' . $s[0]])) {
                   $unprefixed['_' . $s[0]] = array();
                }
 
+               if (!is_null($v)) {
+                  $nullTable['_' . $s[0]] = false;
+               }
                $unprefixed['_' . $s[0]][$s[1]] = $v;
             } else {
                $unprefixed[$s[1]] = $v;
             }
+         }
+      }
+
+      foreach($nullTable as $k => $v) {
+         if ($v) {
+            $unprefixed[$k] = null;
          }
       }
 
