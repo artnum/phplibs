@@ -43,7 +43,7 @@ class Data {
          }
 
       }
-      $ret = preg_replace('/\+[0:]+$/', 'Z', $value);
+      $ret = preg_replace('/Z$/', '+00:00', $value);
       if (!is_null($ret)) {
          return $ret;
       }
