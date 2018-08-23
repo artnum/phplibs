@@ -30,27 +30,29 @@ class Random {
    private $File;
 
    function __construct() {
-      $this->File = new Files();
+      $this->File = new \artnum\Files();
    }
 
    /* return a random string of any length. Use cryptographic secure function if available */
    function str ($len = 256, $toFile = NULL) {
       $rstr = '';
       if (function_exists('random_bytes')) {
-         $rstr = bin2hex(random_bytes($len));
+         $rstr = random_bytes($len);
       } else if(function_exists('openssl_random_pseudo_bytes')) {
-         $rstr = bin2hex(openssl_random_pseudo_bytes($len, true));
+         $rstr = openssl_random_pseudo_bytes($len, true);
       } else {
          /* not so random seed */
          $seed = getmyinode() + getlastmod() + time() + getmypid() + getmyuid();
          mt_srand($seed);
          for ($i = 0; $i < $len; $i++) {
-            $rstr .= mt_rand(0, 255);
+            $rstr .= pack('c', mt_rand(0, 255));
          }
       }
 
-      $rstr = substr($rstr, 0, $len);
-      $this->File->toFile($rstr, $toFile);
+      $rstr = base64_encode($rstr);
+      if (!is_null($toFile)) {
+         $this->File->toFile($rstr, $toFile);
+      }
 
       return $rstr;
    }

@@ -29,19 +29,52 @@ Namespace artnum;
 class Files {
    /* Write data to file if it's writable */
    function toFile ($content, $file) {
-      $write = false;
-      if (!file_exists($file)) {
-         if (is_dir(dirname($file)) && is_writable(dirname($file))) {
-            $write = true;
-         }
+      if ($this->writable($file)) {
+         return file_put_contents($file, $content);
+      }
+      return false;
+   }
+
+   /* check if file is writable, if file doesn't exist, check if the directory is writable */
+   function writable($file) {
+      if (file_exists($file) && is_file($file) && is_writable($file)) {
+         return true;
       } else {
-         if (is_writable($file) && is_file($file)) {
-            $write = true;
+         if (is_dir(dirname($file)) && is_writable(dirname($file))) {
+            return true;
          }
       }
+      return false;
+   }
 
-      if ($write) {
-         return file_put_contents($file, $content);
+   /* alias */
+   function writeable($file) {
+      return $this->writable($file);
+   }
+
+   /* verify if file exists and is readable but if file doesn't exist, check if it could be written */
+   function mayExist($file) {
+      if (file_exists($file)) {
+         if ($this->readable($file)) {
+            return true;
+         }
+      }
+      if ($this->writeable($file)) {
+         return true;
+      }
+      return false;
+   }
+
+   function readable($file) {
+      if (file_exists($file) && is_file($file) && is_readable($file)) {
+         return true;
+      }
+      return false;
+   }
+
+   function fromFile($file) {
+      if ($this->readable($file)) {
+         return file_get_contents($file);
       }
       return false;
    }
