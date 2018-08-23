@@ -48,7 +48,7 @@ class User {
    }
 
    function getkey ($user) {
-      $pre_statment = sprintf('SELECT "%s" FROM "%s" WHERE "%s" = :user', $this->Cols['key'], $this->Table, $this->Cols['username']);
+      $pre_statment = sprintf('SELECT * FROM "%s" WHERE "%s" = :user', $this->Table, $this->Cols['username']);
       try {
          $st = $this->PDO->prepare($pre_statment);
          if ($st) {
@@ -56,7 +56,15 @@ class User {
                if ($st->execute()) {
                   if (($res = $st->fetchAll())) {
                      if (count($res) == 1) {
-                        return $res[0][0];
+                        $ret = array('key' => $res[0][$this->Cols['key']]);
+                        if (isset($this->Cols['salt'])) {
+                           $ret['salt'] = $res[0][$this->Cols['salt']];
+                        }
+                        if (isset($this->Cols['iteration'])) {
+                           $ret['iteration'] = $res[0][$this->Cols['iteration']];
+                        }
+
+                        return $ret;
                      }
                   }
                }

@@ -40,8 +40,9 @@ class Auth {
 
    function handle($request) {
       switch($request->getVerb()) {
-         case 'POST':
          case 'GET':
+            return $this->state($request);
+         case 'POST':
             return $this->authenticate($request);
          case 'PATCH':
             return $this->update($request);
@@ -51,21 +52,21 @@ class Auth {
    }
 
    function verify($request) {
-      return $this->Session->set('auth-valid');
+      return true;
    }
 
    function authorize($request) {
       /* todo autorization part */
-      return $this->verify($request);
+      return $this->Session->get('auth-valid');
    }
 
    /* set password */
    function update($request) {
-      return;
+      return array('auth-success' => true);
    }
 
    function authenticate($request) {
-      if ($request->getVerb() == 'GET') {
+      if (! $request->getParameter('response')) {
          $challenge = $this->Random->str(128);
          if (!$challenge) {
             return -1;
@@ -75,8 +76,18 @@ class Auth {
          $sleep = $this->UserInterface->fail('get', $request->getItem());
          usleep(10000 * $sleep);
 
-         return array('challenge' => $challenge);
-      } else if ($request->getVerb() == 'POST') {
+         $_key = $this->UserInterface->getkey($request->getItem());
+         $ret =  array('challenge' => $challenge, 'salt' => $this->Random->str(32), 'iteration' => 1000);
+         if (!is_null($_key)) {
+            if (isset($_key['salt'])) {
+               $ret['salt'] = $_key['salt'];
+            }
+            if (isset($_key['iteration'])) {
+               $ret['iteration'] = $_key['iteration'];
+            }
+         }
+         return $ret;
+      } else {
          /* second pass */
          $key = $this->Random->str(256);
          $_key = $this->UserInterface->getkey($request->getItem());
@@ -84,17 +95,21 @@ class Auth {
             $key = $_key;
          }
          
-         if ($this->Crypto->compare($this->Crypto->hmac($this->Session->get('auth-challenge'), $key)[0], $request->getParameter('response'))) { 
+         if ($this->Crypto->compare($this->Crypto->hmac($this->Session->get('auth-challenge'), $key)['key'], $request->getParameter('response'))) {
             $this->UserInterface->fail('reset', $request->getItem());
             $this->Session->set('auth-valid', true);
             return array('auth-success' => true);
          } else {
             $this->UserInterface->fail('inc', $request->getItem());
-            $this->Session->set('auth-valid', true);
+            $this->Session->set('auth-valid', false);
             return array('auth-success' => false);
          }
       }
-   }      
+   }
+
+   function state($request) {
+      return array('auth-success' => $this->Session->get('auth-valid'));
+   }
 }
 
 ?>
