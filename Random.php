@@ -39,7 +39,8 @@ class Random {
       if (function_exists('random_bytes')) {
          $rstr = random_bytes($len);
       } else if(function_exists('openssl_random_pseudo_bytes')) {
-         $rstr = openssl_random_pseudo_bytes($len, true);
+         $strongCrypto = true;
+         $rstr = openssl_random_pseudo_bytes($len, $strongCrypto);
       } else {
          /* not so random seed */
          $seed = getmyinode() + getlastmod() + time() + getmypid() + getmyuid();
