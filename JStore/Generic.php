@@ -37,6 +37,7 @@ class Generic {
    function __construct($http_request = NULL, $dont_run = false, $options = array()) {
       $this->dbs = array();
       $this->auths = array();
+      $this->crypto = new \artnum\Crypto();
 
       if(isset($options['session'])) {
          $this->session = $options['session'];
@@ -164,6 +165,7 @@ class Generic {
             }
          }
 
+         $this->signature = null;
          $model = '\\' . $this->request->getCollection() . 'Model';
 
          if(class_exists($model)) {
@@ -193,8 +195,28 @@ class Generic {
                }
                switch(strtolower($this->request->getVerb())) {
                   default:
-                     file_put_contents('php://output', 
-                           json_encode(array('type' => 'results', 'data' => $results)));
+                     if (is_array($results)) {
+                        $length = count($results);
+                     }
+                     if (strtolower($this->request->getVerb()) == 'get' && $length > 0) {
+                        $length = 1;
+                     }
+                     $body = json_encode(array(
+                        'success' => true,
+                        'type' => 'results',
+                        'message' => 'OK',
+                        'data' => $results,
+                        'length' => $length
+                     ));
+                     $hash = $this->crypto->hash($body);
+                     header('X-Artnum-hash: ' . $hash[0]);
+                     header('X-Artnum-hash-algo: ' . $hash[1]);
+                     if (!is_null($this->signature)) {
+                        $sign = $this->crypto->hmac(implode(':', $hash), $this->signature);
+                        header('X-Artnum-sign: ' . $sign[0]);
+                        header('X-Artnum-sign-algo: ' . $sign[1]);
+                     }
+                     file_put_contents('php://output', $body);
                      break;
                   case 'head':
                      foreach($results as $k => $v) {
@@ -218,7 +240,21 @@ class Generic {
          $message = $message->getMessage();
       }
       \artnum\HTTP\Response::code($code); 
-      file_put_contents('php://output', '{ type: "error", message: "' . $message . '"}');
+      $body = json_encode(array(
+         'success' => false,
+         'type' => 'error',
+         'message' => $message,
+         'data' => array(),
+         'length' => 0));
+      $hash = $this->crypto->hash($body);
+      header('X-Artnum-hash: ' . $hash[0]);
+      header('X-Artnum-hash-algo: ' . $hash[1]);
+      if (!is_null($this->signature)) {
+         $sign = $this->crypto->hmac(implode(':', $hash), $this->signature);
+         header('X-Artnum-sign: ' . $sign[0]);
+         header('X-Artnum-sign-algo: ' . $sign[1]);
+      }
+      file_put_contents('php://output', $body);
       exit(-1); 
    }
 
