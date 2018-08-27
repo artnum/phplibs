@@ -33,11 +33,13 @@ class Generic {
    protected $auths;
    protected $session;
    protected $nosession;
+   protected $signature;
 
    function __construct($http_request = NULL, $dont_run = false, $options = array()) {
       $this->dbs = array();
       $this->auths = array();
-      $this->crypto = new \artnum\Crypto();
+      $this->crypto = new \artnum\Crypto(null, null, true); // for sjcl javascript library
+      $this->signature = null;
 
       if(isset($options['session'])) {
          $this->session = $options['session'];
@@ -165,9 +167,7 @@ class Generic {
             }
          }
 
-         $this->signature = null;
          $model = '\\' . $this->request->getCollection() . 'Model';
-
          if(class_exists($model)) {
             try {
                $model = new $model(NULL, NULL);

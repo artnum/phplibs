@@ -31,19 +31,23 @@ class Crypto {
    private $HAlgo;
    private $CAlgo;
 
-   function __construct($halgo = NULL, $calgo = NULL) {
-      if (is_null($halgo)) {
-         $this->HAlgo = 'sha1';
-         $algos = hash_algos();
-         /* select strongest hash function */
-         foreach (array('sha512', 'sha256') as $hash) {
-            if (in_array($hash, $algos)) {
-               $this->HAlgo = $hash;
-               break;
-            }
-         }
+   function __construct($halgo = NULL, $calgo = NULL, $sjcl = false) {
+      if ($sjcl) {
+         $this->HAlgo = 'sha256';
       } else {
-         $this->HAlgo = $halgo;
+         if (is_null($halgo)) {
+            $this->HAlgo = 'sha1';
+            $algos = hash_algos();
+            /* select strongest hash function */
+            foreach (array('sha512', 'sha256') as $hash) {
+               if (in_array($hash, $algos)) {
+                  $this->HAlgo = $hash;
+                  break;
+               }
+            }
+         } else {
+            $this->HAlgo = $halgo;
+         }
       }
 
       if (is_null($calgo)) {
