@@ -252,7 +252,6 @@ class SQL {
       }
 
       return '0';
-
    }
 
    function getDeleteDate($item) {
@@ -540,7 +539,7 @@ class SQL {
             return FALSE;
          }
          if($this->conf('auto-increment')) {
-            $idx = $this->DB->lastInsertId();
+            $idx = $this->DB->lastInsertId($this->IDName);
             $this->DB->commit();
             return $idx;
          } else {

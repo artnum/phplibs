@@ -83,7 +83,11 @@ class HTTPController
    function postAction($req) {
       try {
          $id = $this->Model->write($req->getParameters());
-         return array('success' => true, 'id' => $id);
+         if ($id) {
+            return array('success' => true, 'id' => $id);
+         } else {
+            return array('success' => false, 'id' => -1);
+         }
       } catch(Exception $e) {
          return array('success' => false, 'msg' => $e->getMessage()); 
       }
