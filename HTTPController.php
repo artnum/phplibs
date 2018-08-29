@@ -68,40 +68,40 @@ class HTTPController
                   }
                }
             }
-            if($run < 15 && $req->getParameter('long') && count($results) == 0) {
+            if($run < 15 && $req->getParameter('long') && $results[1] == 0) {
                $continue = true;
                sleep(1);
                $run++;
             }
          } while($continue);
-         return $results;
+         return array('success' => true, 'data' =>  array($results[0], $results[1]), 'msg' => '');
       } catch(Exception $e) {
-         return array('success' => false, 'msg' => $e->getMessage()); 
+         return array('success' => false, 'data' => array(NULL, 0), 'msg' => $e->getMessage());
       }
    }
 
    function postAction($req) {
       try {
-         $id = $this->Model->write($req->getParameters());
-         if ($id) {
-            return array('success' => true, 'id' => $id);
+         $result = $this->Model->write($req->getParameters());
+         if ($result) {
+            return array('success' => true, 'data' => $result, 'msg' => '');
          } else {
-            return array('success' => false, 'id' => -1);
+            return array('success' => false, 'data' => array(NULL, 0), 'msg' => 'Write failed');
          }
       } catch(Exception $e) {
-         return array('success' => false, 'msg' => $e->getMessage()); 
+         return array('success' => false, 'data' => array(NULL, 0), 'msg' => $e->getMessage());
       }
    }
    
    function deleteAction($req) {
       if($req->onCollection()) {
-         return array('success' => false, 'msg' => 'No element selected');
+         return array('success' => false, 'msg' => 'No element selected', 'data' => array(NULL, 0));
       }         
       try {
-         $this->Model->delete($req->getItem());
-         return array('success' => true, 'msg' => 'Element deleted');
+         $result = $this->Model->delete($req->getItem());
+         return array('success' => true, 'msg' => 'Element deleted', 'data' => $result);
       } catch(Exception $e) {
-         return array('success' => false, 'msg' => $e->getMessage());
+         return array('success' => false, 'msg' => $e->getMessage(), 'data' => array(NULL, 0));
       }
    }
 
@@ -113,7 +113,7 @@ class HTTPController
       if(!$req->onCollection()) {
          return $this->postAction($req);      
       }
-      return array('success' => false, 'msg' => 'No element selected');
+      return array('success' => false, 'msg' => 'No element selected', 'data' => array(NULL, 0));
    }
 }
 

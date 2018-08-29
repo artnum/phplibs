@@ -190,23 +190,14 @@ class Generic {
                $this->session->close();
                $action = strtolower($this->request->getVerb()) . 'Action';
                $results = $controller->$action($this->request);
-               if(! $results) {
-                  $results = array(); 
-               }
                switch(strtolower($this->request->getVerb())) {
                   default:
-                     if (is_array($results)) {
-                        $length = count($results);
-                     }
-                     if (strtolower($this->request->getVerb()) == 'get' && $length > 0) {
-                        $length = 1;
-                     }
                      $body = json_encode(array(
-                        'success' => true,
+                        'success' => $results['success'],
                         'type' => 'results',
-                        'message' => 'OK',
-                        'data' => $results,
-                        'length' => $length
+                        'message' => $results['msg'],
+                        'data' => $results['data'][0],
+                        'length' => $results['data'][1]
                      ));
                      $hash = $this->crypto->hash($body);
                      header('X-Artnum-hash: ' . $hash[0]);

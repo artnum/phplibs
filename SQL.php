@@ -185,7 +185,7 @@ class SQL {
                $data[] = $row;
             }
 
-            return $data;
+            return array($data, count($data));
          }
       } catch(\Exception $e) {
          return NULL;
@@ -411,13 +411,13 @@ class SQL {
                $x = $this->unprefix($this->get($d[$this->IDName]));
                $return[] = $this->_postprocess($x);
             }
-            return $return;
+            return array($return, count($return));
          }
       } catch(\Exception $e) {
-         return NULL;
+         return array(NULL, 0);
       }
 
-      return NULL;
+      return array(NULL, 0);
    }
 
    function unprefix($entry, $table = NULL) {
@@ -475,7 +475,7 @@ class SQL {
       $entry = $this->get($id);
       if($entry) {
          $unprefixed = $this->unprefix($entry);
-         return $this->_postprocess($unprefixed);
+         return array($this->_postprocess($unprefixed), 1);
       }
       return array();
    }
@@ -610,9 +610,9 @@ class SQL {
       }
 
       if(!isset($prefixed[$this->IDName]) || empty($prefixed[$this->IDName])) {
-         return $this->create($prefixed);
+         return array(array(array('id' => $this->create($prefixed))), 1);
       } else {
-         return $this->update($prefixed);
+         return array(array(array('id' => $this->update($prefixed))), 1);
       }
    }
 

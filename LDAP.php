@@ -123,15 +123,15 @@ class LDAP  {
                }
             }
          }
-         return array($ret);
+         return array(array($ret), 1);
       }
-      return array();
+      return array(NULL, 0);
    }
 
    function delete($dn) {
       $c = $this->DB->writable();
       if($this->exists($dn)) {
-         return ldap_delete($c, $this->_dn($dn));
+         return array(ldap_delete($c, $this->_dn($dn)), 0);
       } 
    }
 
@@ -229,7 +229,7 @@ class LDAP  {
             $ret[] = $r;
          }
       }
-      return $ret;
+      return array($ret, count($ret));
    }
 }
 ?>
