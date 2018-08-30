@@ -498,6 +498,23 @@ class SQL {
       return FALSE;
    }
 
+   function _type($col, $value) {
+      $types = $this->conf('force-type');
+      if (!is_null($types) && isset($types[$col])) {
+         switch(strtolower($types[$col])) {
+            case 'str':  case 'string': case 'char': case 'character':
+            default:
+               return \PDO::PARAM_STR;
+            case 'numeric': case 'number': case 'integer': case 'int': case 'num':
+               return \PDO::PARAM_INT;
+            case 'bool': case 'boolean':
+               return \PDO::PARAM_BOOL;
+         }
+      }
+
+      return NULL;
+   }
+
    function create($data) {
       $columns = array();
       $values = array();
@@ -517,10 +534,13 @@ class SQL {
       try {
          $st = $this->DB->prepare($this->req('create', array('COLTXT' => $columns_txt, 'VALTXT' => $values_txt)));
          foreach($data as $k_data => &$v_data) {
-            $bind_type = \PDO::PARAM_STR;
-            if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
-            else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
-            else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
+            $bind_type = $this->_type($k_data, $v_data);
+            if (is_null($bind_type)) {
+               $bind_type = \PDO::PARAM_STR;
+               if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
+               else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
+               else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
+            }
 
             $st->bindParam(':' . $k_data, $v_data, $bind_type);
          }
@@ -570,10 +590,13 @@ class SQL {
       try {
          $st = $this->DB->prepare($this->req('update', array('COLVALTXT' => $columns_values_txt)));
          foreach($data as $k_data => &$v_data) {
-            $bind_type = \PDO::PARAM_STR;
-            if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
-            else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
-            else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
+            $bind_type = $this->_type($k_data, $v_data);
+            if (is_null($bind_type)) {
+               $bind_type = \PDO::PARAM_STR;
+               if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
+               else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
+               else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
+            }
 
             $st->bindParam(':' . $k_data, $v_data, $bind_type);
          }
@@ -591,7 +614,6 @@ class SQL {
 
    function write($data) {
       $prefixed = array();
-      
       foreach($data as $k => $v) {
          $prefixed[$this->conf('Table') . '_' . $k] = $v;
       }
