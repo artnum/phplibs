@@ -40,6 +40,7 @@ class Generic {
       $this->auths = array();
       $this->crypto = new \artnum\Crypto(null, null, true); // for sjcl javascript library
       $this->signature = null;
+      $this->_tstart = microtime(true);
 
       if(isset($options['session'])) {
          $this->session = $options['session'];
@@ -139,7 +140,12 @@ class Generic {
       }
    }
 
+   private function _t() {
+      header('X-Artnum-execution-us: ' . intval((microtime(true) - $this->_tstart) * 1000000));
+   }
+
    function run() {
+      $start = microtime(true);
       $this->session->start();
 
       if (substr($this->request->getCollection(), 0, 1) == '.') {
@@ -207,9 +213,11 @@ class Generic {
                         header('X-Artnum-sign: ' . $sign[0]);
                         header('X-Artnum-sign-algo: ' . $sign[1]);
                      }
+                     $this->_t();
                      file_put_contents('php://output', $body);
                      break;
                   case 'head':
+                     $this->_t();
                      foreach($results as $k => $v) {
                         header('X-Artnum-' . $k . ': ' . $v);
                      }
@@ -245,6 +253,7 @@ class Generic {
          header('X-Artnum-sign: ' . $sign[0]);
          header('X-Artnum-sign-algo: ' . $sign[1]);
       }
+      $this->_t();
       file_put_contents('php://output', $body);
       exit(-1); 
    }
