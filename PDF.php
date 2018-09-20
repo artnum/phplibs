@@ -40,10 +40,117 @@ class PDF extends \tFPDF {
    protected $unbreaked_line = false;
    protected $last_font_size = 0;
    protected $tagged_fonts = array();
+   protected $blocks = array();
+   protected $current_block = null;
 
    function __construct() {
       parent::tFPDF();
       $this->last_font_size = $this->FontSize;
+   }
+
+   function Cell($w, $h = 0, $txt = '', $border = 0, $ln = 0, $align = '', $fill = false, $link = '') {
+      $ret = parent::Cell($w, $h, $txt, $border, $ln, $align, $fill, $link);
+      $this->_block();
+      return $ret;
+   }
+
+   function Image($file, $x = null, $y = null, $w = 0, $h = 0, $type = null) {
+      $ret = parent::Image($file, $x, $y, $w, $h, $type);
+      $this->_block();
+      return $ret;
+   }
+
+   function Line($x1, $y1, $x2, $y2) {
+      $ret = parent::Line($x1, $y1, $x2, $y2);
+      $this->_block();
+      return $ret;
+   }
+
+   function Link($x, $y, $w, $h, $link) {
+      $ret = parent::Link($x, $y, $w, $h, $link);
+      $this->_block();
+      return $ret;
+   }
+
+   function Ln($h = null) {
+      $ret = parent::Ln($h);
+      $this->_block();
+      return $ret;
+   }
+
+   function MultiCell($w, $h, $txt, $border=0, $align='J', $fill=false) {
+      $ret = parent::MultiCell($w, $h, $txt, $border, $align, $fill);
+      $this->_block();
+      return $ret;
+   }
+
+   function Text($x, $y, $txt) {
+      $ret = parent::Text($x, $y, $txt);
+      $this->_block();
+      return $ret;
+   }
+
+   function SetY($y, $resetX = true) {
+      $ret = parent::SetY($y, $resetX);
+      $this->_block();
+      return $ret;
+   }
+
+   function SetXY($x, $y) {
+      $ret = parent::SetXY($x, $y);
+      $this->_block();
+      return $ret;
+   }
+
+   function AddPage($orientation = '', $size = '', $rotation = 0) {
+      $ret = parent::AddPage($orientation, $size, $rotation);
+      $this->_block();
+      return $ret;
+   }
+
+   function block($name, $after = null) {
+      $this->close_block();
+      if (isset($this->blocks[$name])) {
+         $this->SetY($this->blocks[$name]['origin']);
+      } else {
+         if ($after) {
+            if (isset($this->blocks[$after])) {
+               $this->SetY($this->blocks[$after]['max-y']);
+            }
+         }
+
+         $this->blocks[$name] = array('origin' => $this->GetY(), 'closed' => false, 'max-y' => $this->GetY());
+      }
+      $this->current_block = $name;
+   }
+
+   protected function _block() {
+      if ($this->current_block && isset($this->blocks[$this->current_block])) {
+         $y = $this->GetY();
+         if ($this->blocks[$this->current_block]['max-y'] < $y) {
+            $this->blocks[$this->current_block]['max-y'] = $y;
+         }
+      }
+   }
+
+   function to_block_end() {
+      if ($this->current_block) {
+         $this->SetY($this->blocks[$this->current_block]['max-y']);
+      }
+   }
+
+   function close_block() {
+      $y = null;
+      if ($this->current_block) {
+         if (isset($this->blocks[$this->current_block])) {
+            $this->blocks[$this->current_block]['closed'] = true;
+            $y = $this->blocks[$this->current_block]['max-y'];
+         }
+         $this->current_block = null;
+      }
+      if ($y) {
+         $this->SetY($y);
+      }
    }
 
    function resetFontSize() {
@@ -58,6 +165,7 @@ class PDF extends \tFPDF {
          $this->_out(sprintf('BT /F%d %.2F Tf ET',$this->CurrentFont['i'],$this->FontSizePt));
       }
    }
+
 
    function reset() {
       $this->SetXY($this->lMargin, $this->tMargin);
@@ -485,6 +593,7 @@ class PDF extends \tFPDF {
       if($this->tabbed_align) {
          $this->current_align = 'left';
       }
+      $this->_block();
    }
 
    function hr($fontsize = 0) {
@@ -502,6 +611,7 @@ class PDF extends \tFPDF {
       if($fontsize != 0) {
          $this->resetFontSize();
       }
+      $this->_block();
    }
 }
 ?>
