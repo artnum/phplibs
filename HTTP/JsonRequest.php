@@ -34,15 +34,29 @@ class JsonRequest extends Path
    public $client;
    public $multiple;
    public $items;
+   private $hashCtx;
 
    function __construct()
    {
       parent::__construct();
+      $_algos = hash_algos();
+      foreach (array('md5', 'sha1', 'tiger128', 'haval192') as $h) {
+         if (in_array($h, $_algos)) {
+            $this->hashCtx = hash_init($h);
+            break;
+         }
+      }
+
       $this->multiple = false;
       $this->items = array();
       $this->verb = $_SERVER['REQUEST_METHOD'];
       $this->protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
       $this->client = $_SERVER['REMOTE_ADDR'];
+
+      hash_update($this->hashCtx, $this->verb);
+      hash_update($this->hashCtx, $this->protocol);
+      hash_update($this->hashCtx, $this->client);
+
       $this->parseParams();
 
       if ($this->onItem()) {
@@ -51,6 +65,16 @@ class JsonRequest extends Path
             $this->multiple = true;
          }
       }
+
+      if(isset($_SERVER['HTTP_X_ARTNUM_REQID'])) {
+         hash_update($this->hashCtx, $_SERVER['HTTP_X_ARTNUM_REQID']);
+      }
+
+      $this->reqid = hash_final($this->hashCtx);
+   }
+
+   function getId() {
+      return $this->reqid;
    }
 
    function getClient()  {
@@ -181,12 +205,14 @@ class JsonRequest extends Path
       $params = array();
 
       if(isset($_SERVER['QUERY_STRING'])) {
+         hash_update($this->hashCtx, $_SERVER['QUERY_STRING']);
          $params = $this->_parse_str($_SERVER['QUERY_STRING']);
       }
 
       $content = file_get_contents('php://input');
 
       if($content != FALSE) {
+         hash_update($this->hashCtx, $content);
          if(isset($_SERVER['CONTENT_TYPE']) && strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
             foreach($this->_parse_str($content) as $_k => $_v) {
                if(!empty($params[$_k])) {
