@@ -148,6 +148,36 @@ class Generic {
       $start = microtime(true);
       $this->session->start();
 
+      /* In some case, Firefox send twice the same request. It seems that this
+       * behavior is triggered by extension (in my case firebug). I have seen
+       * this happen where no firebug was used so it might be linked to some
+       * extension. Anyway this mitigate this strange behavior.
+       */
+      switch (strtolower($this->request->getVerb())) {
+         case 'post': case 'put': case 'delete': case 'patch':
+            $history = $this->session->get('req-history');
+            if (!$history) {
+               $history = array($this->request->getId() => $start);
+            } else {
+               if (isset($history[$this->request->getId()])) {
+                  error_log('Duplicate request with id : ' . $this->request->getId());
+                  return 0;
+               }
+
+               $history[$this->request->getId()] = $start;
+            }
+
+            foreach($history as $k => $v) {
+               /* 15 min */
+               if (round($start - floatval($v)) > 900)  {
+                  unset($history[$k]);
+               }
+            }
+
+            $this->session->set('req-history', $history);
+            break;
+      }
+
       if (substr($this->request->getCollection(), 0, 1) == '.') {
          $ret = $this->internal();
          $this->session->close();
