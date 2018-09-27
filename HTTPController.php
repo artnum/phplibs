@@ -80,9 +80,32 @@ class HTTPController
       }
    }
 
+   function patchAction ($req) {
+      if (!$req->onCollection()) {
+         try {
+            $result = $this->Model->write($req->getParameters());
+            if ($result) {
+               return array('success' => true, 'data' => $result, 'msg' => '');
+            } else {
+               return array('success' => false, 'data' => array(NULL, 0), 'msg' => 'Write failed');
+            }
+         } catch(Exception $e) {
+            return array('success' => false, 'data' => array(NULL, 0), 'msg' => $e->getMessage());
+         }
+      }
+      return array('success' => false, 'msg' => 'No element selected', 'data' => array(NULL, 0));
+   }
+
+   function putAction($req) {
+      if(!$req->onCollection()) {
+         return $this->postAction($req);
+      }
+      return array('success' => false, 'msg' => 'No element selected', 'data' => array(NULL, 0));
+   }
+
    function postAction($req) {
       try {
-         $result = $this->Model->write($req->getParameters());
+         $result = $this->Model->overwrite($req->getParameters());
          if ($result) {
             return array('success' => true, 'data' => $result, 'msg' => '');
          } else {
@@ -103,17 +126,6 @@ class HTTPController
       } catch(Exception $e) {
          return array('success' => false, 'msg' => $e->getMessage(), 'data' => array(NULL, 0));
       }
-   }
-
-   function patchAction ($req) {
-      return $this->putAction($req);
-   }
-
-   function putAction($req) {
-      if(!$req->onCollection()) {
-         return $this->postAction($req);      
-      }
-      return array('success' => false, 'msg' => 'No element selected', 'data' => array(NULL, 0));
    }
 }
 
