@@ -188,10 +188,10 @@ class SQL {
             return array($data, count($data));
          }
       } catch(\Exception $e) {
-         return NULL;
+         return array(NULL, 0);
       }
 
-      return NULL;
+      return array(NULL, 0);
    }
 
    function get($id) {
@@ -477,7 +477,7 @@ class SQL {
          $unprefixed = $this->unprefix($entry);
          return array($this->_postprocess($unprefixed), 1);
       }
-      return array();
+      return array(NULL, 0);
    }
 
    function exists($id) {
@@ -610,6 +610,18 @@ class SQL {
       } catch(\Exception $e) {
          return FALSE;
       }
+   }
+
+   function overwrite($data) {
+      $defaults = $this->conf('defaults');
+      if (is_array($defaults)) {
+         foreach($defaults as $k => $v) {
+            if (!isset($data[$k])) {
+               $data[$k] = $v;
+            }
+         }
+      }
+      return $this->write($data);
    }
 
    function write($data) {
