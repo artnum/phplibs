@@ -42,6 +42,7 @@ class PDF extends \tFPDF {
    protected $tagged_fonts = array();
    protected $blocks = array();
    protected $current_block = null;
+   protected $margin = array('left' => null, 'right' => null, 'top' => null);
 
    function __construct() {
       parent::tFPDF();
@@ -54,7 +55,7 @@ class PDF extends \tFPDF {
       return $ret;
    }
 
-   function Image($file, $x = null, $y = null, $w = 0, $h = 0, $type = null) {
+   function Image($file, $x = NULL, $y = NULL, $w = 0, $h = 0, $type = '', $link = '') { 
       $ret = parent::Image($file, $x, $y, $w, $h, $type);
       $this->_block();
       return $ret;
@@ -108,7 +109,11 @@ class PDF extends \tFPDF {
       return $ret;
    }
 
-   function block($name, $after = null) {
+   function block($name, $options = null) {
+      $after = null;
+      if (is_string($options)) {
+         $after = $options;
+      }
       $this->close_block();
       if (isset($this->blocks[$name])) {
          $this->SetY($this->blocks[$name]['origin']);
@@ -122,21 +127,31 @@ class PDF extends \tFPDF {
          $this->blocks[$name] = array('origin' => $this->GetY(), 'closed' => false, 'max-y' => $this->GetY());
       }
       $this->current_block = $name;
+      $this->SetX($this->left);
    }
 
-   protected function _block() {
+   protected function _block($y = null) {
       if ($this->current_block && isset($this->blocks[$this->current_block])) {
-         $y = $this->GetY();
+         if (!$y) { $y = $this->GetY(); }
          if ($this->blocks[$this->current_block]['max-y'] < $y) {
             $this->blocks[$this->current_block]['max-y'] = $y;
          }
       }
+
    }
 
    function to_block_end() {
       if ($this->current_block) {
          $this->SetY($this->blocks[$this->current_block]['max-y']);
       }
+      $this->SetX($this->left);
+   }
+
+   function to_block_begin() {
+      if ($this->current_block) {
+         $this->SetY($this->blocks[$this->current_block]['origin']);
+      }
+      $this->SetX($this->left);
    }
 
    function close_block() {
@@ -150,6 +165,43 @@ class PDF extends \tFPDF {
       }
       if ($y) {
          $this->SetY($y);
+      }
+      $this->SetX($this->left);
+   }
+
+   function __get($name) {
+      switch ($name) {
+         case 'innerWidth':
+            return $this->w - ($this->right + $this->left);
+         case 'innerCenter':
+            return ($this->w - ($this->left + $this->right)) / 2;
+         case 'right': case 'left': case 'top':
+            if (isset($this->margin[$name]) && $this->margin[$name]) {
+               return $this->margin[$name];
+            }
+            if ($name == 'right') { return $this->rMargin; }
+            if ($name == 'left') { return $this->lMargin; }
+            if ($name == 'top') { return $this->tMargin; }
+      }
+   }
+
+   function __set($name, $value) {
+      switch ($name) {
+         case 'right': case 'left': case 'top':
+            if (is_numeric($value)) {
+               if ($name == 'right') { $value += $this->rMargin; }
+               if ($name == 'left') { $value += $this->lMargin; $this->SetX($value); }
+               if ($name == 'top') { $value += $this->tMargin; }
+               $this->margin[$name] = $value;
+            }
+      }
+   }
+
+   function __unset($name) {
+      switch ($name) {
+         case 'left': case 'right': case 'top':
+            $this->margin[$name] = null;
+            if ($name == 'left') { $this->SetX($this->left); }
       }
    }
 
@@ -168,7 +220,7 @@ class PDF extends \tFPDF {
 
 
    function reset() {
-      $this->SetXY($this->lMargin, $this->tMargin);
+      $this->SetXY($this->left, $this->top);
    }
 
    function getFontSize() {
@@ -195,13 +247,13 @@ class PDF extends \tFPDF {
       if ($x < 0) {
          $x = $this->GetX();
       } else {
-         $x += $this->lMargin;
+         $x += $this->left;
       }
 
       if ($y < 0) {
          $y = $this->GetY();
       } else {
-         $y += $this->tMargin;
+         $y += $this->top;
       }
 
       $this->SetXY($x, $y);
@@ -219,16 +271,16 @@ class PDF extends \tFPDF {
       if(is_string($mm)) {
          switch($mm) {
             default:
-            case 'right': $mm = $this->w  - ($this->rMargin + $this->lMargin + $this->getFontWidth()) ; break;
+            case 'right': $mm = $this->w  - ($this->right + $this->left + $this->getFontWidth()) ; break;
             case 'left': $mm =0; break;
-            case 'middle': $mm = ($this->w / 2) - ($this->lMargin + $this->getFontWidth()); break;
+            case 'middle': $mm = ($this->w / 2) - ($this->left + $this->getFontWidth()); break;
          }
       }
       $this->tabs[] = array($mm, $align);
    }
 
    function tab($i) {
-      $this->SetX($this->tabs[$i-1][0] + $this->lMargin);
+      $this->SetX($this->tabs[$i-1][0] + $this->left);
       $this->current_align = $this->tabs[$i-1][1];
       $this->tabbed_align = true;
    }
@@ -245,9 +297,9 @@ class PDF extends \tFPDF {
 
    function vtab($i) {
       if(is_numeric($i)) {
-         $this->SetY($this->vtabs[$i-1] + $this->tMargin);
+         $this->SetY($this->vtabs[$i-1] + $this->top);
       } else {
-         $this->SetY($this->nvtabs[$i] + $this->tMargin);
+         $this->SetY($this->nvtabs[$i] + $this->top);
       }
    }
 
@@ -256,10 +308,13 @@ class PDF extends \tFPDF {
    }
 
    function printTaggedLn($txt, $options = array()) {
+      if (is_string($txt)) {
+         $txt = array($txt);
+      }
       $break = isset($options['break']) ? $options['break'] : true;
       if (isset($options['align']) && strcasecmp($options['align'], 'right') == 0) {
          $txt = array_reverse($txt);
-         $this->SetX($this->w - $this->rMargin);
+         $this->SetX($this->w - ($this->right + $this->GetStringWidth(' ')));
          foreach($txt as $t) {
             if ($t[0] == '%') {
                if (isset($this->tagged_fonts[substr($t, 1)])) {
@@ -296,17 +351,20 @@ class PDF extends \tFPDF {
    }
 
    function printLn($txt, $options = array()) {
+      $origin = $this->GetX();
       $this->unbreaked_line = false;
 
       $break = isset($options['break']) ? $options['break'] : true;
       $linespacing = isset($options['linespacing']) ? $options['linespacing'] : 'single';
       $align = isset($options['align']) ? $options['align'] : $this->current_align;
       $underline = isset($options['underline']) ? $options['underline'] : false;
-      $max_width = isset($options['max-width']) ? $options['max-width'] : $this->w -( $this->GetX() + $this->rMargin);
+      $max_width = isset($options['max-width']) ? $options['max-width'] : $this->w -( $this->GetX() + $this->right);
+      $multiline = isset($options['multiline']) ? $options['multiline'] : false;
 
       $height = $this->getFontSize();
       $width = $this->GetStringWidth($txt);
 
+      $paragraph = array();
       if($width > $max_width) {
          $fromX = $this->GetX();
          switch($align) {
@@ -320,8 +378,8 @@ class PDF extends \tFPDF {
                         if(isset($options['break']) && !$options['break']) {
                            $options['break'] = true;
                         }
-                        $txt = $sub;
-                        break;
+                        $paragraph[] = $sub;
+                        $sub = '';
                      }
 
                      if($sub == '') {
@@ -330,11 +388,15 @@ class PDF extends \tFPDF {
                         $sub .= ' ' . $ttxt[$i];
                      }
                   }
+                  if ($sub != '') {
+                     $paragraph[] = $sub;
+                  }
                } else {
                   $sub = '';
                   for($i = 0; $i < strlen($txt); $i++) {
                      if($this->GetStringWidth($sub . $txt[$i]) > $max_width) {
-                        $txt = $sub; break;
+                        $paragraph[] = $sub;
+                        $sub = '';
                      }
                      $sub .= $txt[$i];
                   }
@@ -343,18 +405,27 @@ class PDF extends \tFPDF {
             case 'right':
                break;
          }
+      } else {
+         $paragraph[] = $txt;
       }
 
       switch($align) {
          default:
          case 'left':
             $underline_start = $this->GetX();
-            $this->Cell($width, $height, $txt);
+            $this->Cell($this->GetStringWidth($paragraph[0]), $height, $paragraph[0]);
+            if ($multiline) {
+               for ($i = 1; $i < count($paragraph); $i++) {
+                  $this->br();
+                  $this->SetX($origin);
+                  $this->Cell($this->GetStringWidth($paragraph[$i]), $height, $paragraph[$i]);
+               }
+            }
             break;
          case 'right':
-            $this->SetX($this->w - ($this->rMargin + $width));
+            $this->SetX($this->w - ($this->right + $width));
             $underline_start = $this->GetX();
-            $this->Cell($width, $height, $txt);
+            $this->Cell($width, $height, $paragraph[0]);
             break;
          case 'center':
             break;
@@ -461,6 +532,8 @@ class PDF extends \tFPDF {
       $angle = - $angle;
       $x2 = $x1 + $length * cos(deg2rad($angle));
       $y2 = $y1 + $length * sin(deg2rad($angle));
+      $this->_block($y2);
+      $this->_block($y1);
 
       if($type == 'line') {
          $this->Line($x1, $y1, $x2, $y2);
@@ -486,7 +559,6 @@ class PDF extends \tFPDF {
                break;
          }
       }
-
       $this->DrawColor = $prevDrawColor;
       $this->_out($this->DrawColor);
    }
@@ -495,7 +567,7 @@ class PDF extends \tFPDF {
       $prevLineWidth = $this->LineWidth;
       $prevDrawColor = $this->DrawColor;
       
-      $maxLength = isset($options['length']) ? $options['length'] : ($this->w - ($this->rMargin + $this->lMargin));
+      $maxLength = isset($options['length']) ? $options['length'] : ($this->w - ($this->right + $this->left));
       $lineWidth = isset($options['line']) ? $options['line'] : 0.2;
       $squareSize = isset($options['square']) ? $options['square'] : 4;
       $lineType = isset($options['line-type']) ? $options['line-type'] : 'line';
@@ -513,11 +585,11 @@ class PDF extends \tFPDF {
    
       $this->SetLineWidth($lineWidth);
 
-      $lineX = $startX = isset($options['x-origin']) ? $options['x-origin'] : $this->lMargin;
+      $lineX = $startX = isset($options['x-origin']) ? $options['x-origin'] : $this->left;
       $lineY = $startY = isset($options['y-origin']) ? $options['y-origin'] : $this->GetY();
       $lenX = $stopX =  $maxLength;
-      if($lineX != $this->lMargin && !isset($options['length'])) {
-         $lenX = $this->w - ($lineX + $this->rMargin);
+      if($lineX != $this->left && !isset($options['length'])) {
+         $lenX = $this->w - ($lineX + $this->right);
       }
       $lenY = $stopY = $startY + $height;
 
@@ -538,7 +610,7 @@ class PDF extends \tFPDF {
          }
       }
       for($i = $lineY; $i <= $stopY; $i += $squareSize) {
-         $this->drawLine($startX, $i, $lenX, 0, $lineType) ;
+         $this->drawLine($startX, $i, $lenX, 0, $lineType);
       }
 
       if($border) {
@@ -562,7 +634,7 @@ class PDF extends \tFPDF {
    }
 
    function getRemainingWidth() {
-      return $this->w - ($this->rMargin + $this->GetX());
+      return $this->w - ($this->right + $this->GetX());
    }
 
    function getLineHeight($linespacing = 'single') {
@@ -593,6 +665,7 @@ class PDF extends \tFPDF {
       if($this->tabbed_align) {
          $this->current_align = 'left';
       }
+      $this->SetX($this->left);
       $this->_block();
    }
 
