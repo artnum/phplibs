@@ -225,8 +225,10 @@ class LDAP  {
          for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
             $dn = ldap_get_dn($c, $e);
             $dn = ldap_explode_dn($dn, 0);
-            $r = $this->read(rawurlencode($dn[0]))[0];
-            $ret[] = $r;
+            $r = $this->read(rawurlencode($dn[0]));
+            if ($r[1] == 1) {
+               $ret[] = $r[0][0];
+            }
          }
       }
       return array($ret, count($ret));
