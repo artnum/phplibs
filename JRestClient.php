@@ -121,6 +121,20 @@ class JRestClient {
       return $this->exec();
    }
 
+   /* Edit an element */
+   function patch($data, $id, $collection = NULL) {
+      $jdata = \json_encode($data);
+      print_r($jdata);
+      $this->_init($this->_build_url(array($id), $collection));
+      \curl_setopt($this->ch, \CURLOPT_CUSTOMREQUEST, 'PATCH');
+      \curl_setopt($this->ch, \CURLOPT_POSTFIELDS, $jdata);
+      \curl_setopt($this->ch, \CURLOPT_HTTPHEADER, array(
+               'Content-Type: application/json',
+               'Content-Length: ' . \strlen($jdata),
+               'Content-MD5: ' . \md5($jdata)));
+      return $this->exec();
+   }
+
    function direct($url) {
       $this->_init($url);
       \curl_setopt($this->ch, \CURLOPT_HTTPGET, TRUE);
