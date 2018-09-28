@@ -105,8 +105,13 @@ class PDF extends \tFPDF {
 
    function AddPage($orientation = '', $size = '', $rotation = 0) {
       $ret = parent::AddPage($orientation, $size, $rotation);
-      $this->_block();
+      $this->_reinitblock();
       return $ret;
+   }
+
+   function SetFillColor($color) {
+      list($r, $g, $b) = sscanf($color, "#%02x%02x%02x");
+      return parent::SetFillColor($r, $g, $b);
    }
 
    function block($name, $options = null) {
@@ -130,6 +135,12 @@ class PDF extends \tFPDF {
       $this->SetX($this->left);
    }
 
+   protected function _reinitblock() {
+      if ($this->current_block && isset($this->blocks[$this->current_block])) {
+         $this->blocks[$this->current_block]['max-y'] = $this->GetY();
+      }
+   }
+
    protected function _block($y = null) {
       if ($this->current_block && isset($this->blocks[$this->current_block])) {
          if (!$y) { $y = $this->GetY(); }
@@ -137,7 +148,6 @@ class PDF extends \tFPDF {
             $this->blocks[$this->current_block]['max-y'] = $y;
          }
       }
-
    }
 
    function to_block_end() {
@@ -160,6 +170,7 @@ class PDF extends \tFPDF {
          if (isset($this->blocks[$this->current_block])) {
             $this->blocks[$this->current_block]['closed'] = true;
             $y = $this->blocks[$this->current_block]['max-y'];
+            $this->_background_block();
          }
          $this->current_block = null;
       }
@@ -167,6 +178,25 @@ class PDF extends \tFPDF {
          $this->SetY($y);
       }
       $this->SetX($this->left);
+   }
+
+   function background_block($color) {
+      if ($this->current_block) {
+         if (isset($this->blocks[$this->current_block])) {
+            $this->blocks[$this->current_block]['color'] = $color;
+         }
+      }
+   }
+
+   function _background_block() {
+      if ($this->current_block) {
+         if (isset($this->blocks[$this->current_block]) && isset($this->blocks[$this->current_block]['color'])) {
+            $y1 = $this->blocks[$this->current_block]['origin'];
+            $y2 = $this->blocks[$this->current_block]['max-y'];
+            $this->SetFillColor($this->blocks[$this->current_block]['color']);
+            $this->Rect($this->left, $y1, $this->w - ($this->left + $this->right), $y2 - $y1, 'F');
+         }
+      }
    }
 
    function __get($name) {
