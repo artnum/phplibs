@@ -29,6 +29,9 @@ namespace artnum;
 include('tfpdf/tfpdf.php');
 
 class PDF extends \tFPDF {
+   protected $layers = array();
+   protected $current_layer = '_origin';
+   protected $previous_layer = '_origin';
    protected $doc = array();
    protected $tabs = array();
    protected $vtabs = array();
@@ -46,6 +49,8 @@ class PDF extends \tFPDF {
 
    function __construct() {
       parent::tFPDF();
+      $this->add_layer('_origin');
+      $this->current_layer = '_origin';
       $this->last_font_size = $this->FontSize;
    }
 
@@ -104,14 +109,31 @@ class PDF extends \tFPDF {
    }
 
    function AddPage($orientation = '', $size = '', $rotation = 0) {
+      $this->_flushblock();
       $ret = parent::AddPage($orientation, $size, $rotation);
       $this->_reinitblock();
       return $ret;
    }
 
-   function SetFillColor($color) {
-      list($r, $g, $b) = sscanf($color, "#%02x%02x%02x");
+   function SetFillColor($color, $g = NULL, $b = NULL) {
+      if (is_string($color)) {
+         list($r, $g, $b) = sscanf($color, "#%02x%02x%02x");
+      } else {
+         $r = $color;
+      }
       return parent::SetFillColor($r, $g, $b);
+   }
+
+   function _pdf_color($color, $g = NULL, $b = NULL) {
+      if (is_string($color)) {
+         list($r, $g, $b) = sscanf($color, "#%02x%02x%02x");
+      }
+
+      if (is_null($g)) {
+         return sprintf('%.3F g', $r / 255);
+      } else {
+         return sprintf('%.3F %.3F %.3F rg', $r / 255, $g / 255, $b / 255);
+      }
    }
 
    function block($name, $options = null) {
@@ -129,14 +151,23 @@ class PDF extends \tFPDF {
             }
          }
 
-         $this->blocks[$name] = array('origin' => $this->GetY(), 'closed' => false, 'max-y' => $this->GetY());
+         $dheight = $this->getLineHeight() - $this->getFontSize();
+         $this->blocks[$name] = array('origin' => $this->GetY(), 'closed' => false, 'max-y' => $this->GetY(), 'left' => $this->left, 'right' => $this->right, 'delta-height' => $dheight);
       }
       $this->current_block = $name;
       $this->SetX($this->left);
    }
 
+   protected function _flushblock() {
+      if ($this->current_block && isset($this->blocks[$this->current_block])) {
+         $this->blocks[$this->current_block]['max-y'] = $this->GetY();
+         $this->_draw_block_bg($this->blocks[$this->current_block]);
+      }
+   }
+
    protected function _reinitblock() {
       if ($this->current_block && isset($this->blocks[$this->current_block])) {
+         $this->blocks[$this->current_block]['origin'] = $this->GetY();
          $this->blocks[$this->current_block]['max-y'] = $this->GetY();
       }
    }
@@ -164,13 +195,24 @@ class PDF extends \tFPDF {
       $this->SetX($this->left);
    }
 
+   function _draw_block_bg($block) {
+      if (isset($block['color'])) {
+         $this->switch_layer('background');
+         $this->SetFillColor($block['color']);
+         $this->Rect($block['left'], $block['origin'] - $block['delta-height'], $this->w - ($block['left'] + $block['right']), $block['delta-height'] + ($block['max-y'] - $block['origin']), 'F');
+         $this->SetFillColor('#000000');
+         $this->reset_layer();
+      }
+   }
+
    function close_block() {
       $y = null;
       if ($this->current_block) {
          if (isset($this->blocks[$this->current_block])) {
-            $this->blocks[$this->current_block]['closed'] = true;
-            $y = $this->blocks[$this->current_block]['max-y'];
-            $this->_background_block();
+            $block = &$this->blocks[$this->current_block];
+            $block['closed'] = true;
+            $y = $block['max-y'];
+            $this->_draw_block_bg($block);
          }
          $this->current_block = null;
       }
@@ -181,22 +223,84 @@ class PDF extends \tFPDF {
    }
 
    function background_block($color) {
+      $this->add_layer('background', array('index' => -99999));
       if ($this->current_block) {
          if (isset($this->blocks[$this->current_block])) {
             $this->blocks[$this->current_block]['color'] = $color;
+            $this->blocks[$this->current_block]['painted-y'] = $this->blocks[$this->current_block]['origin'];
          }
       }
    }
 
-   function _background_block() {
-      if ($this->current_block) {
-         if (isset($this->blocks[$this->current_block]) && isset($this->blocks[$this->current_block]['color'])) {
-            $y1 = $this->blocks[$this->current_block]['origin'];
-            $y2 = $this->blocks[$this->current_block]['max-y'];
-            $this->SetFillColor($this->blocks[$this->current_block]['color']);
-            $this->Rect($this->left, $y1, $this->w - ($this->left + $this->right), $y2 - $y1, 'F');
+
+   function add_layer($name, $options = array()) {
+      $index = isset($options['index']) ? $options['index'] : 0;
+      $drawcolor = isset($options['draw-color']) ? $this->_pdf_color($options['draw-color']) : '0 G';
+      $fillcolor = isset($options['fill-color']) ? $this->_pdf_color($options['fill-color']) : '0 g';
+      $textcolor = isset($options['text-color']) ? $this->_pdf_color($options['text-color']) : '0 g';
+
+      if (! isset($this->layers[$name])) {
+         $this->layers[$name] = array('data' => array(), 'index' => $index, 'fill-color' => $fillcolor, 'draw-color' => $drawcolor, 'text-color' => $textcolor);
+      }
+   }
+
+   function switch_layer($name) {
+      if (isset($this->layers[$name])) {
+         $this->previous_layer = $this->current_layer;
+         $this->current_layer = $name;
+         $this->FillColor = $this->layers[$this->current_layer]['fill-color'];
+         $this->DrawColor = $this->layers[$this->current_layer]['draw-color'];
+         $this->TextColor = $this->layers[$this->current_layer]['text-color'];
+      }
+   }
+
+   function reset_layer() {
+      if ($this->previous_layer) {
+         $this->current_layer = $this->previous_layer;
+      } else {
+         $this->current_layer = '_origin';
+      }
+      $this->FillColor = $this->layers[$this->current_layer]['fill-color'];
+      $this->DrawColor = $this->layers[$this->current_layer]['draw-color'];
+      $this->TextColor = $this->layers[$this->current_layer]['text-color'];
+   }
+
+   function _out($s) {
+      if ($this->state == 2) {
+         if (!isset($this->current_layer)) {
+            if (!isset($this->layers['_origin']['data'][$this->page])) {
+               $this->layers['_origin']['data'][$this->page] = $s . "\n";
+            } else {
+               $this->layers['_origin']['data'][$this->page] .= $s . "\n";
+            }
+         } else if (isset($this->layers[$this->current_layer]['data'][$this->page])) {
+            $this->layers[$this->current_layer]['data'][$this->page] .= $s ."\n";
+         } else {
+            $this->layers[$this->current_layer]['data'][$this->page] = $s ."\n";
+         }
+      } else {
+         $this->buffer .= $s . "\n";
+      }
+   }
+
+   function _putpages() {
+      usort($this->layers, function ($a, $b) {
+         if (!isset($a['index'])) { $a['index'] = 0; }
+         if (!isset($b['index'])) { $b['index'] = 0; }
+         if ($a['index'] == $b['index']) { return 0; }
+         return ($a['index'] < $b['index']) ? -1 : 1;
+      });
+      $pages = array();
+      foreach ($this->layers as $layer) {
+         foreach ($layer['data'] as $k => $line) {
+            if (!isset($pages[$k])) {
+               $pages[$k] = $layer['fill-color'] . "\n" . $layer['draw-color'] . "\n";
+            }
+            $pages[$k] .= $line . "\n";
          }
       }
+      $this->pages =$pages;
+      parent::_putpages();
    }
 
    function __get($name) {
@@ -344,7 +448,11 @@ class PDF extends \tFPDF {
       $break = isset($options['break']) ? $options['break'] : true;
       if (isset($options['align']) && strcasecmp($options['align'], 'right') == 0) {
          $txt = array_reverse($txt);
-         $this->SetX($this->w - ($this->right + $this->GetStringWidth(' ')));
+         if (!isset($options['max-width'])) {
+            $this->SetX($this->w - ($this->right + $this->GetStringWidth('0')));
+         } else {
+            $this->SetX($this->GetX() + $options['max-width']);
+         }
          foreach($txt as $t) {
             if ($t[0] == '%') {
                if (isset($this->tagged_fonts[substr($t, 1)])) {
@@ -388,7 +496,7 @@ class PDF extends \tFPDF {
       $linespacing = isset($options['linespacing']) ? $options['linespacing'] : 'single';
       $align = isset($options['align']) ? $options['align'] : $this->current_align;
       $underline = isset($options['underline']) ? $options['underline'] : false;
-      $max_width = isset($options['max-width']) ? $options['max-width'] : $this->w -( $this->GetX() + $this->right);
+      $max_width = isset($options['max-width']) ? $options['max-width'] : $this->w -($this->GetX() + $this->right);
       $multiline = isset($options['multiline']) ? $options['multiline'] : false;
 
       $height = $this->getFontSize();
