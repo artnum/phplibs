@@ -28,10 +28,9 @@ Namespace artnum;
 
 require('id.php');
 
-class SQL {
+class SQL extends \artnum\JStore\OP {
    protected $DB;
    protected $Table;
-   protected $Config;
    protected $IDName;
    protected $Request = array(
       'delete' => 'DELETE FROM "\\Table" WHERE "\\IDName" = :id LIMIT 1',
@@ -48,6 +47,7 @@ class SQL {
    );
 
    function __construct($db, $table, $id_name, $config) {
+      parent::__construct($config);
       $this->DB = $db;
       if (!is_null($db)) {
          $this->DB->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
@@ -67,34 +67,6 @@ class SQL {
 
    function dbtype() {
       return 'sql';
-   }
-
-   function conf($name, $value = NULL) {
-      if (!is_string($name)) {
-         return NULL;
-      }
-      switch (strtolower($name)) {
-         case 'idname':
-            if (!is_null($value) && is_string($value)) {
-               $this->IDName = $value;
-            }
-            return $this->IDName;
-         case 'table':
-            if (!is_null($value) && is_string($value)) {
-               $this->Table = $value;
-            }
-            return $this->Table;
-      }
-      if (is_null($value)) {
-         if(isset($this->Config[$name])) {
-            return $this->Config[$name];
-         }
-      } else {
-         $this->Config[$name] = $value;
-         return $this->Config[$name];
-      }
-
-      return null;
    }
 
    function set_req($name, $value) {
@@ -137,7 +109,7 @@ class SQL {
       return '';
    }
 
-   function delete($id) {
+   function _delete($id) {
       if (!$this->conf('delete')) {
          try {
             $st = $this->DB->prepare($this->req('delete'));
@@ -244,7 +216,11 @@ class SQL {
          try {
             $st = $this->DB->prepare($this->req('getTableLastMod'));
             if($st->execute()) {
-               return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
+               if ($this->conf('mtime.ts')) {
+                  return (int)$st->fetch(\PDO::FETCH_NUM)[0];
+               } else {
+                  return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
+               }
             }
          } catch( \Exception $e) {
             return '0';
@@ -284,7 +260,11 @@ class SQL {
                $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
                $st->bindParam(':id', $item, $bind_type);
                if($st->execute()) {
-                  return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
+                  if ($this->conf('mtime.ts')) {
+                     return (int)$st->fetch(\PDO::FETCH_NUM)[0];
+                  } else {
+                     return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
+                  }
                }
             }
          } catch (\Exception $e) {
@@ -471,7 +451,7 @@ class SQL {
       return $entry;
    }
 
-   function read($id) {
+   function _read($id) {
       $entry = $this->get($id);
       if($entry) {
          $unprefixed = $this->unprefix($entry);
@@ -480,7 +460,7 @@ class SQL {
       return array(NULL, 0);
    }
 
-   function exists($id) {
+   function _exists($id) {
       try {
          $st = $this->DB->prepare($this->req('exists'));
          $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
@@ -489,7 +469,6 @@ class SQL {
             if($st->fetch()) {
                return TRUE;
             }
-         } else {
          }
       } catch(\Exception $e) {
          return FALSE;
@@ -612,7 +591,7 @@ class SQL {
       }
    }
 
-   function overwrite($data) {
+   function _overwrite($data) {
       $defaults = $this->conf('defaults');
       if (is_array($defaults)) {
          foreach($defaults as $k => $v) {
@@ -624,7 +603,7 @@ class SQL {
       return $this->write($data);
    }
 
-   function write($data) {
+   function _write($data) {
       $prefixed = array();
       foreach($data as $k => $v) {
          $prefixed[$this->conf('Table') . '_' . $k] = $v;
@@ -644,6 +623,13 @@ class SQL {
       }
 
       if(!isset($prefixed[$this->IDName]) || empty($prefixed[$this->IDName])) {
+         if (!is_null($this->conf('create'))) {
+            if (!$this->conf('create.ts')) {
+               $prefixed[$this->conf('create')] = $this->DataLayer->datetime(time());
+            } else {
+               $prefixed[$this->conf('create')] = time();
+            }
+         }
          return array(array(array('id' => $this->create($prefixed))), 1);
       } else {
          return array(array(array('id' => $this->update($prefixed))), 1);
