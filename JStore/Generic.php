@@ -247,10 +247,13 @@ class Generic {
                      file_put_contents('php://output', $body);
                      break;
                   case 'head':
-                     $this->_t();
                      foreach($results as $k => $v) {
                         header('X-Artnum-' . $k . ': ' . $v);
                      }
+                     if (!$results['exists']) {
+                        \artnum\HTTP\Response::code(404);
+                     }
+                     $this->_t();
                      break;
                }
             } catch(Exception $e) {
