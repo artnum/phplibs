@@ -541,6 +541,7 @@ class PDF extends \tFPDF {
                }
                break;
             case 'right':
+               $paragraph[] = $txt;
                break;
          }
       } else {
