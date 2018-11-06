@@ -316,10 +316,15 @@ class SQL extends \artnum\JStore\OP {
          }    
          $value = trim($value); 
 
+         $fieldname = $name;
+         if (($pos = strpos($name, ':', true)) !== FALSE) {
+             $fieldname = substr($name, 0, $pos);
+         }
+
          if($no_value) {
-            $s[$name] = $this->conf('Table') . '_' . $name  . $op;
+            $s[$name] = $this->conf('Table') . '_' . $fieldname  . $op;
          } else {
-            $str = $this->conf('Table') . '_' . $name . $op;
+            $str = $this->conf('Table') . '_' . $fieldname . $op;
             if(is_numeric($value)) {
                $str .= $value;
             } else {
