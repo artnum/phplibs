@@ -39,6 +39,16 @@ class JsonRequest extends Path
    function __construct()
    {
       parent::__construct();
+
+      /* this work with Collection/Item only. Item as a path is useful, so
+       * join back Collection/i/t/em into [Collection][i/t/ek]
+       */
+      if (count($this->url_elements) > 2) {
+         $collection = array_shift($this->url_elements);
+         $item = implode('/', $this->url_elements);
+         $this->url_elements = array($collection, $item);
+      }
+
       $_algos = hash_algos();
       foreach (array('md5', 'sha1', 'tiger128', 'haval192') as $h) {
          if (in_array($h, $_algos)) {
