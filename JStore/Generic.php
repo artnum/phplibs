@@ -34,6 +34,8 @@ class Generic {
    protected $session;
    protected $nosession;
    protected $signature;
+   protected $lockManager;
+   protected $data;
 
    function __construct($http_request = NULL, $dont_run = false, $options = array()) {
       $this->dbs = array();
@@ -41,6 +43,8 @@ class Generic {
       $this->crypto = new \artnum\Crypto(null, null, true); // for sjcl javascript library
       $this->signature = null;
       $this->_tstart = microtime(true);
+      $this->lockManager = null;
+      $this->data = array();
 
       if(isset($options['session'])) {
          $this->session = $options['session'];
@@ -88,6 +92,17 @@ class Generic {
       return true;
    }
 
+   function set($name, $value) {
+      switch(strtolower($name)) {
+         default:
+            $this->data[$name] = $value;
+            break;
+         case 'lockmanager':
+            $this->lockManager = $value;
+            break;
+      }
+   }
+
    function _db($m) {
       $type = $m->dbtype();
       if(!is_array($type)) {
@@ -119,7 +134,7 @@ class Generic {
    /* Internal query */
    private function internal () {
       switch(strtolower(substr($this->request->getCollection(), 1))) {
-      case 'auth':
+         case 'auth':
             if(! $this->request->onItem()) {
                $this->fail('Authentication must have an object');
             } else {
@@ -137,7 +152,30 @@ class Generic {
                file_put_contents('php://output', json_encode($validation));
             }
             break;
-      }
+         case 'lock':
+            if (! $this->lockManager) {
+               $this->fail('No lock manager');
+            }
+            if (! $this->request->onItem()) {
+               $this->fail('Lock must have an object to lock');
+            } else {
+               if (strtolower($this->request->getVerb()) != 'post') {
+                  $this->fail('Lock only have a POST inteface');
+               }
+               $lockOp = array('on' => $this->request->getItem(), 'operation' => '', 'key' => '');
+               foreach($lockOp as $k => $v) {
+                  if ($this->request->hasParameter($k)) {
+                     $lockOp[$k] = $this->request->getParameter($k);
+                  }
+               }
+               $lock = $this->lockManager->request($lockOp);
+               if (!$lock) {
+                  $this->fail('Lock module fail');
+               }
+               file_put_contents('php://output', json_encode($lock));
+            }
+            break;
+         }
    }
 
    private function _t() {
