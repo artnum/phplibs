@@ -72,15 +72,28 @@ class Crypto {
       return $this->CAlgo;
    }
 
-   /* hmac */
-   function hmac($value, $key) {
-      $signed = hash_hmac($this->HAlgo, $value, $key, true);
-      return array(base64_encode($signed), $this->HAlgo);
+   /* Encoding/Decoding base64 YUI Library
+    * It uses specific variant as this is for opaque token that should just be
+    * passed around (in http url, in http body, in json body, ...). Don't use
+    * it if the other side must encode/decode.
+    */
+   function y64encode ($value) {
+      return strtr(base64_encode($value), array('+' => '.', '/' => '_', '=' => '-'));
    }
 
-   function hash($value) {
+   function y64decode($value) {
+      return base64_decode(strtr($value, array('-' => '=', '_' => '/', '.' => '+')));
+   }
+
+   /* hmac */
+   function hmac($value, $key, $raw = false) {
+      $signed = hash_hmac($this->HAlgo, $value, $key, true);
+      return array($raw ? $signed : base64_encode($signed), $this->HAlgo);
+   }
+
+   function hash($value, $raw = false) {
       $hashed = hash($this->HAlgo, $value, true);
-      return array(base64_encode($hashed), $this->HAlgo);
+      return array($raw ? $hashed : base64_encode($hashed), $this->HAlgo);
    }
 
    function compare($value1, $value2) {
@@ -89,6 +102,10 @@ class Crypto {
       } else {
          return strcmp($value1, $value2) == 0;
       }
+   }
+
+   function random($size) {
+      return openssl_random_pseudo_bytes($size);
    }
 
    /* Symmetric encryption/decryption */
