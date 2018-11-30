@@ -73,7 +73,7 @@ class Lock {
       $res = $stmt->execute(); 
       if($res) {
          $v = $res->fetchArray();
-         if($v && $v[0]) {
+         if($v && intval($v[0]) > self::LOCK_NONE) {
             if($this->Timeout == 0) {
                return array($v[2], -1);
             }
@@ -106,6 +106,7 @@ class Lock {
       } else {
          $key = false;
          $result['timeout'] = -1;
+         $can_lock = true;
       }
 
       if ($key && !is_null($prev_key)) {
@@ -132,7 +133,7 @@ class Lock {
          $this->DB->exec('COMMIT');
          $l = $this->_is_locked($id);
          if ($l) {
-            if (strcmp($l, $key) == 0) {
+            if (strcmp($l[0], $key) == 0) {
                $result['state'] = 'acquired';
                $result['key'] = $this->Crypto->y64encode($key);
                $result['timeout'] = $l[1];
@@ -157,13 +158,13 @@ class Lock {
          } else {
             $available = true;
          }
-         $i++;
+            $i++;
       } while(!$available && $i < 5);
       return $available;
    }
 
    function unlock($path, $key) {
-      $result = array('lock' => $path, 'state' => 'unlocked', 'key' => '', 'timeout' => 0, 'error' => true);
+      $result = array('lock' => $path, 'state' => 'unlocked', 'key' => '', 'timeout' => 0, 'error' => false);
       $id = $this->Crypto->hash($path, true)[0];
       $key = $this->Crypto->y64decode($key);
       if(! $this->_begin_transaction()) {
