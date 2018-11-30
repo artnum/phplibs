@@ -47,7 +47,7 @@ class Lock {
       $this->DB = new \SQLite3($file);
       $this->DBFile = $file;
       try {
-         $stmt = $this->DB->exec('CREATE TABLE IF NOT EXISTS "lock" ( "lock_path" BLOB(32) UNIQUE NOT NULL, "lock_key" BLOB(32) UNIQUE NOT NULL, "lock_state" INTEGER DEFAULT(' . self::LOCK_NONE . '), "lock_timestamp" INTEGER ); CREATE INDEX IF NOT EXISTS "idxLockPath" ON "lock"("lock_Path"); CREATE INDEX IF NOT EXISTS "idxLockKey" ON "lock"("lock_key");');
+         $stmt = $this->DB->exec('CREATE TABLE IF NOT EXISTS "lock" ( "lock_path" BLOB(32) UNIQUE NOT NULL, "lock_key" BLOB(32) NULL, "lock_state" INTEGER DEFAULT(' . self::LOCK_NONE . '), "lock_timestamp" INTEGER ); CREATE INDEX IF NOT EXISTS "idxLockPath" ON "lock"("lock_Path"); CREATE INDEX IF NOT EXISTS "idxLockKey" ON "lock"("lock_key");');
       } catch (\Exception $e) {
          /* ignore */
       }
@@ -173,7 +173,7 @@ class Lock {
          return $result;
       }
 
-      $stmt = $this->DB->prepare('UPDATE "lock" SET "lock_state" = 0, "lock_timestamp" = 0, "lock_key" =\'\' WHERE "lock_key" = :key AND "lock_path" = :id');
+      $stmt = $this->DB->prepare('UPDATE "lock" SET "lock_state" = 0, "lock_timestamp" = 0, "lock_key" = NULL WHERE "lock_key" = :key AND "lock_path" = :id');
       $stmt->bindValue(':key', $key, \SQLITE3_BLOB);
       $stmt->bindValue(':id', $id, \SQLITE3_BLOB);
       $stmt->execute();
