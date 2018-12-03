@@ -262,6 +262,7 @@ class Generic {
       
             try {
                $this->session->close();
+               $results = array('success' => false, 'type' => 'results', 'data' => null, 'length' => 0);
                $action = strtolower($this->request->getVerb()) . 'Action';
                $results = $controller->$action($this->request);
                switch(strtolower($this->request->getVerb())) {
