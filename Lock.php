@@ -3,7 +3,8 @@ Namespace artnum;
 
 /* Use sqlite as backend as it works on OCFS2 clustered filesystem */
 class Lock {
-
+   protected $Type;
+   protected $RKey;
    protected $DB;
    protected $Timeout;
 
@@ -11,9 +12,62 @@ class Lock {
    const LOCK_SHARED = 25; // NOT USED
    const LOCK_EXCLUSIVE = 50;
 
-   function __construct($project, $tmpdir = NULL) {
-      $file = $project .'-lock.sqlite';
-      $crypto = $project . '-lock.rand';
+   function __construct($params, $tmpdir = null) {
+      $this->Crypto = new \artnum\Crypto();
+      $this->RKey = false;
+
+      if (is_string($params)) {
+         /* legacy sqlite */
+         $params = array('dbtype' => 'legacy-sqlite', 'project' => $params, 'tmpdir' => $tmpdir);
+      }
+
+      switch ($params['dbtype']) {
+      default:
+      case 'pdo':
+         $this->Type = 'pdo';
+         if (!isset($params['db'])) {
+            throw new Exception('No database specified');
+         }
+         $this->DB = $params['db'];
+         switch ($this->DB->getAttribute(\PDO::ATTR_DRIVER_NAME)) {
+         case 'mysql':
+            $this->DB->query('SET SQL_MODE=ANSI_QUOTES;');
+            break;
+         }
+         $this->_getOrGenKey();
+         break;
+      case 'legacy-sqlite':
+         $this->Type = 'sqlite';
+         /* original implementation sqlite */
+         if (isset($params['project'])) {
+            $this->_sqlite($params['project'], isset($params['tmpdir']) ? $params['tmpdir'] : NULL);
+         }
+         break;
+      }
+   }
+
+   function _getOrGenKey() {
+      $stmt = $this->DB->prepare('SELECT "cle_data" FROM "cle" ORDER BY "cle_id" DESC;');
+      if ($stmt->execute()) {
+         $key = $stmt->fetch();
+         if ($key) {
+            $this->RKey = $key[0];
+         }
+      }
+
+      if ($this->RKey == FALSE) {
+         $this->RKey = $this->Crypto->random(64);
+         $stmt = $this->DB->prepare('INSERT INTO "cle" ( "cle_data" ) VALUES ( :cledata );');
+         $stmt->bindValue(':cledata', $this->RKey, \PDO::PARAM_LOB);
+         if (!$stmt->execute()) {
+            error_log('Cannot store key into database : ' . var_export($stmt->errorInfo(), true));
+         }
+      }
+   }
+
+   function _sqlite($project, $tmpdir = NULL) {
+      $file = $project .'-verrou.sqlite';
+      $crypto = $project . '-verrou.rand';
       $dir = '';
       if (is_null($tmpdir) || !is_writable($tmpdir)) {
          $envdir = getenv('ARTNUM_LOCK_TMPDIR');
@@ -29,7 +83,6 @@ class Lock {
       $file = $dir . '/' . $file;
       $crypto = $dir . '/' . $crypto;
 
-      $this->Crypto = new \artnum\Crypto();
       $new_key = true;
       if (file_exists($crypto)) {
          $this->RKey = file_get_contents($crypto);
@@ -44,14 +97,15 @@ class Lock {
       }
 
       $this->Timeout = 900; /* Timeout default to 15 minutes */
-      $this->DB = new \SQLite3($file);
+      $this->DB = new \PDO('sqlite:' . $file);
       $this->DBFile = $file;
       try {
-         $stmt = $this->DB->exec('CREATE TABLE IF NOT EXISTS "lock" ( "lock_path" BLOB(32) UNIQUE NOT NULL, "lock_key" BLOB(32) NULL, "lock_state" INTEGER DEFAULT(' . self::LOCK_NONE . '), "lock_timestamp" INTEGER ); CREATE INDEX IF NOT EXISTS "idxLockPath" ON "lock"("lock_Path"); CREATE INDEX IF NOT EXISTS "idxLockKey" ON "lock"("lock_key");');
+         $stmt = $this->DB->query('CREATE TABLE IF NOT EXISTS "verrou" ( "verrou_path" BLOB(32) UNIQUE NOT NULL, "verrou_key" BLOB(32) NULL, "verrou_state" INTEGER DEFAULT(' . self::LOCK_NONE . '), "verrou_timestamp" INTEGER ); CREATE INDEX IF NOT EXISTS "idxVerrouPath" ON "verrou"("verrou_path"); CREATE INDEX IF NOT EXISTS "idxVerrouKey" ON "verrou"("verrou_key");');
       } catch (\Exception $e) {
          /* ignore */
       }
    }
+
 
    function _genkey($id, $prev_key = null) {
       $data = $id;
@@ -68,11 +122,11 @@ class Lock {
    }
 
    function _is_locked($id) {
-      $stmt = $this->DB->prepare('SELECT "lock_state", "lock_timestamp", "lock_key" FROM "lock" WHERE "lock_path" = :id');
-      $stmt->bindValue(':id', $id, \SQLITE3_BLOB);
-      $res = $stmt->execute(); 
+      $stmt = $this->DB->prepare('SELECT "verrou_state", "verrou_timestamp", "verrou_key" FROM "verrou" WHERE "verrou_path" = :id');
+      $stmt->bindValue(':id', $id, \PDO::PARAM_LOB);
+      $res = $stmt->execute();
       if($res) {
-         $v = $res->fetchArray();
+         $v = $stmt->fetch();
          if($v && intval($v[0]) > self::LOCK_NONE) {
             if($this->Timeout == 0) {
                return array($v[2], -1);
@@ -124,13 +178,13 @@ class Lock {
       }
       if($can_lock) {
          $key = $this->_genkey($id, $prev_key);
-         $stmt = $this->DB->prepare('INSERT OR REPLACE INTO "lock"("lock_path", "lock_state", "lock_timestamp", "lock_key") VALUES ( :id, :lock, :ts, :key)');
-         $stmt->bindValue(':id', $id, \SQLITE3_BLOB);
-         $stmt->bindValue(':ts', time(), \SQLITE3_INTEGER);
-         $stmt->bindValue(':key', $key, \SQLITE3_BLOB);
-         $stmt->bindValue(':lock', $type, \SQLITE3_INTEGER);
+         $stmt = $this->DB->prepare('REPLACE INTO "verrou"("verrou_path", "verrou_state", "verrou_timestamp", "verrou_key") VALUES ( :id, :lock, :ts, :key)');
+         $stmt->bindValue(':id', $id, \PDO::PARAM_LOB);
+         $stmt->bindValue(':ts', time(), \PDO::PARAM_INT);
+         $stmt->bindValue(':key', $key, \PDO::PARAM_LOB);
+         $stmt->bindValue(':lock', $type, \PDO::PARAM_INT);
          $stmt->execute();
-         $this->DB->exec('COMMIT');
+         $this->_commit();
          $l = $this->_is_locked($id);
          if ($l) {
             if (strcmp($l[0], $key) == 0) {
@@ -142,18 +196,41 @@ class Lock {
             }
          }
       } else {
-         $this->DB->exec('COMMIT');
+         $this->_commit();
          $result['state'] = 'locked';
       }
 
       return $result;
    }
 
+   function _commit() {
+      switch ($this->Type) {
+      default:
+      case 'pdo':
+         $this->DB->commit();
+         break;
+      case 'sqlite':
+         $this->DB->query('COMMIT');
+         break;
+      }
+   }
+
    function _begin_transaction() {
       $i = 0;
       $available = false;
       do {
-         if(! $this->DB->exec('BEGIN IMMEDIATE TRANSACTION')) {
+         $tr = false;
+         switch ($this->Type) {
+         default:
+         case 'pdo':
+            $tr = $this->DB->beginTransaction();
+            break;
+         case 'sqlite':
+            $tr = $this->DB->query('BEGIN IMMEDIATE TRANSACTION');
+            break;
+         }
+
+         if(! $tr) {
             usleep(rand(1000, 3000));
          } else {
             $available = true;
@@ -173,11 +250,11 @@ class Lock {
          return $result;
       }
 
-      $stmt = $this->DB->prepare('UPDATE "lock" SET "lock_state" = 0, "lock_timestamp" = 0, "lock_key" = NULL WHERE "lock_key" = :key AND "lock_path" = :id');
-      $stmt->bindValue(':key', $key, \SQLITE3_BLOB);
-      $stmt->bindValue(':id', $id, \SQLITE3_BLOB);
+      $stmt = $this->DB->prepare('UPDATE "verrou" SET "verrou_state" = 0, "verrou_timestamp" = 0, "verrou_key" = NULL WHERE "verrou_key" = :key AND "verrou_path" = :id');
+      $stmt->bindValue(':key', $key, \PDO::PARAM_LOB);
+      $stmt->bindValue(':id', $id, \PDO::PARAM_LOB);
       $stmt->execute();
-      $this->DB->exec('COMMIT');
+      $this->_commit();
 
       $locked = $this->_is_locked($id);
       if ($locked) {
@@ -246,5 +323,4 @@ class Lock {
 
    }
 }
-
 ?>
