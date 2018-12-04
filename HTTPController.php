@@ -26,7 +26,7 @@
  */
 Namespace artnum;
 
-class HTTPController
+class HTTPController extends \artnum\HTTP\CORS
 {
    protected $Model;
 
