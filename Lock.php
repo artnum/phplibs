@@ -12,7 +12,7 @@ class Lock {
    const LOCK_SHARED = 25; // NOT USED
    const LOCK_EXCLUSIVE = 50;
 
-   function __construct($params, $tmpdir = null) {
+   function __construct ($params, $tmpdir = null) {
       $this->Crypto = new \artnum\Crypto();
       $this->RKey = false;
 
@@ -46,7 +46,7 @@ class Lock {
       }
    }
 
-   function _getOrGenKey() {
+   function _getOrGenKey () {
       $stmt = $this->DB->prepare('SELECT "cle_data" FROM "cle" ORDER BY "cle_id" DESC;');
       if ($stmt->execute()) {
          $key = $stmt->fetch();
@@ -65,7 +65,7 @@ class Lock {
       }
    }
 
-   function _sqlite($project, $tmpdir = NULL) {
+   function _sqlite ($project, $tmpdir = NULL) {
       $file = $project .'-verrou.sqlite';
       $crypto = $project . '-verrou.rand';
       $dir = '';
@@ -106,8 +106,7 @@ class Lock {
       }
    }
 
-
-   function _genkey($id, $prev_key = null) {
+   function _genkey ($id, $prev_key = null) {
       $data = $id;
       $data .= $prev_key ? $prev_key : '-';
       foreach (array('REMOTE_ADDR', 'REMOTE_HOST', 'REMOTE_PORT', 'HTTP_REFERER', 'HTTP_ACCEPT_ENCODING', 'HTTP_USER_AGENT', 'HTTP_ACCEPT_LANGUAGE') as $i) {
@@ -121,7 +120,7 @@ class Lock {
       return $key[0];
    }
 
-   function _is_locked($id) {
+   function _is_locked ($id) {
       $stmt = $this->DB->prepare('SELECT "verrou_state", "verrou_timestamp", "verrou_key" FROM "verrou" WHERE "verrou_path" = :id');
       $stmt->bindValue(':id', $id, \PDO::PARAM_LOB);
       $res = $stmt->execute();
@@ -142,8 +141,10 @@ class Lock {
       return false;
    }
 
-   function set_timeout($timeout) {
-      $this->Timeout = $timeout; 
+   function set_timeout ($timeout) {
+      if (is_integer($timeout) && intval($timeout) >= 0) {
+         $this->Timeout = $timeout;
+      }
    }
 
    function lock ($path, $prev_key = null, $type = self::LOCK_EXCLUSIVE) {
@@ -203,7 +204,7 @@ class Lock {
       return $result;
    }
 
-   function _commit() {
+   function _commit () {
       switch ($this->Type) {
       default:
       case 'pdo':
@@ -215,7 +216,7 @@ class Lock {
       }
    }
 
-   function _begin_transaction() {
+   function _begin_transaction () {
       $i = 0;
       $available = false;
       do {
@@ -240,7 +241,7 @@ class Lock {
       return $available;
    }
 
-   function unlock($path, $key) {
+   function unlock ($path, $key) {
       $result = array('lock' => $path, 'state' => 'unlocked', 'key' => '', 'timeout' => 0, 'error' => false);
       $id = $this->Crypto->hash($path, true)[0];
       $key = $this->Crypto->y64decode($key);
@@ -265,7 +266,7 @@ class Lock {
       return $result;
    }
 
-   function state($path) {
+   function state ($path) {
       $result = array('lock' => $path, 'state' => 'unlocked', 'key' => '', 'timeout' => 0, 'error' => false);
       $id = $this->Crypto->hash($path, true)[0];
       if (! $this->_begin_transaction()) {
@@ -282,7 +283,7 @@ class Lock {
       return $result;
    }
 
-   function request($req) {
+   function request ($req) {
       $now = time();
       $result = false;
       if (!isset($req['key']) || empty($req['key'])) { $req['key'] = null; }
@@ -305,7 +306,7 @@ class Lock {
       return $result;
    }
 
-   function http_locking() {
+   function http_locking () {
       $key = isset($_GET['key']) ? $_GET['key'] : null;
       $result = array('lock' => '', 'state' => 'unlocked', 'key'=>'');
       if (!empty($_GET['lock'])) {
@@ -320,7 +321,6 @@ class Lock {
          $result = $this->request(array('on' => $_GET['state'], 'operation' => 'state'));
       }
       echo json_encode($result);
-
    }
 }
 ?>
