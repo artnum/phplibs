@@ -34,6 +34,7 @@ class JsonRequest extends Path
    public $client;
    public $multiple;
    public $items;
+   public $clientReqId = null;
    private $hashCtx;
 
    function __construct()
@@ -76,8 +77,14 @@ class JsonRequest extends Path
          }
       }
 
-      if(isset($_SERVER['HTTP_X_ARTNUM_REQID'])) {
+      if (isset($_SERVER['HTTP_X_ARTNUM_REQID'])) {
          hash_update($this->hashCtx, $_SERVER['HTTP_X_ARTNUM_REQID']);
+         $this->clientReqId = $_SERVER['HTTP_X_ARTNUM_REQID'];
+      }
+
+      if (isset($_SERVER['HTTP_X_REQUEST_ID'])) {
+         hash_update($this->hashCtx, $_SERVER['HTTP_X_REQUEST_ID']);
+         $this->clientReqId = $_SERVER['HTTP_X_REQUEST_ID'];
       }
 
       $this->reqid = hash_final($this->hashCtx);
@@ -97,6 +104,10 @@ class JsonRequest extends Path
 
    function getVerb() {
       return $this->verb;
+   }
+
+   function getClientReqId() {
+      return is_null($this->clientReqId) ? false : base64_encode($this->clientReqId);
    }
 
    function onCollection() {
@@ -170,6 +181,11 @@ class JsonRequest extends Path
          $name = urldecode($name);
          $value = urldecode($value);
 
+         if (strcmp($name, '_qid') === 0) {
+            $this->clientReqId = $value;
+            continue;
+         }
+
          /* Special case. When item is identified by a path ( /my/item/id ), a parameter name '!' can be used :
                https://example.com/store/Collection/?!=/my/item/id
           */
@@ -239,7 +255,13 @@ class JsonRequest extends Path
             $json_root = json_decode($content, true);
             if($json_root) {
                foreach($json_root as $_k => $_v) {
-                     $params[$_k] = $_v;
+                  if (strcmp($_k, '_qid') === 0) {
+                     if (is_string($_v)) {
+                        $this->clientReqId = $_v;
+                     }
+                     continue;
+                  }
+                  $params[$_k] = $_v;
                }         
             }
          }

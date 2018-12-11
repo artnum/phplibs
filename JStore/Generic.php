@@ -275,6 +275,10 @@ class Generic {
                         'length' => $results['data'][1]
                      ));
                      $hash = $this->crypto->hash($body);
+
+                     if ($this->request->getClientReqId()) {
+                        header('X-Request-ID: ' . $this->request->getClientReqId());
+                     }
                      header('X-Artnum-hash: ' . $hash[0]);
                      header('X-Artnum-hash-algo: ' . $hash[1]);
                      if (!is_null($this->signature)) {
