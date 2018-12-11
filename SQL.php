@@ -116,7 +116,7 @@ class SQL extends \artnum\JStore\OP {
             $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
             $st->bindParam(':id', $id, $bind_type);
          } catch (\Exception $e) {
-            error_log('Database error : ' . $e->getMessage());
+            $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
             return false;
          }
          return $st->execute();
@@ -137,7 +137,7 @@ class SQL extends \artnum\JStore\OP {
          try {
             return $this->update($data) ? TRUE : FALSE;
          } catch (\Exception $e) {
-            error_log('Database error : ' . $e->getMessage());
+            $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
             return FALSE;
          }
       }
@@ -162,7 +162,7 @@ class SQL extends \artnum\JStore\OP {
             return array($data, count($data));
          }
       } catch(\Exception $e) {
-         error_log('Database error : ' . $e->getMessage());
+         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
          return array(NULL, 0);
       }
 
@@ -181,7 +181,7 @@ class SQL extends \artnum\JStore\OP {
             }
          }
       } catch (\Exception $e) {
-         error_log('Database error : ' . $e->getMessage());
+         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
          return NULL;
       }
 
@@ -195,7 +195,7 @@ class SQL extends \artnum\JStore\OP {
             return $st->fetch(\PDO::FETCH_NUM)[0];
          }
       } catch (\Exception $e) {
-         error_log('Database error : ' . $e->getMessage());
+         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
          return '0';
       }
 
@@ -212,7 +212,7 @@ class SQL extends \artnum\JStore\OP {
          $val = new \DateTime($val);
          return $val->getTimestamp();
       } catch(\Exception $e) {
-         error_log('Database error : ' . $e->getMessage());
+         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
          return 0;
       }
    }
@@ -229,7 +229,7 @@ class SQL extends \artnum\JStore\OP {
                }
             }
          } catch( \Exception $e) {
-            error_log('Database error : ' . $e->getMessage());
+            $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
             return '0';
          }
       }
@@ -252,7 +252,7 @@ class SQL extends \artnum\JStore\OP {
                }
             }
          } catch(\Exception $e) {
-            error_log('Database error : ' . $e->getMessage());
+            $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
             return '0';
          }
       } else {
@@ -276,7 +276,7 @@ class SQL extends \artnum\JStore\OP {
                }
             }
          } catch (\Exception $e) {
-            error_log('Database error : ' . $e->getMessage());
+            $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
             return '0';   
          }
       }
@@ -328,7 +328,7 @@ class SQL extends \artnum\JStore\OP {
             if(is_numeric($value)) {
                $str .= $value;
             } else {
-               $str .= '"' . $value . '"';
+               $str .= '\'' . $value . '\'';
             }
             $s[$name] = $str;
          }
@@ -408,7 +408,7 @@ class SQL extends \artnum\JStore\OP {
             return array($return, count($return));
          }
       } catch(\Exception $e) {
-         error_log('Database error : ' . $e->getMessage());
+         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
          return array(NULL, 0);
       }
 
@@ -486,7 +486,7 @@ class SQL extends \artnum\JStore\OP {
             }
          }
       } catch(\Exception $e) {
-         error_log('Database error : ' . $e->getMessage());
+         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
          return FALSE;
       }
 
@@ -561,7 +561,7 @@ class SQL extends \artnum\JStore\OP {
             return $data[$this->IDName];
          }
       } catch (\Exception $e) {
-         error_log('Database error : ' . $e->getMessage());
+         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
          return FALSE;      
       }
    }
@@ -604,7 +604,7 @@ class SQL extends \artnum\JStore\OP {
          }
          return $id;
       } catch(\Exception $e) {
-         error_log('Database error : ' . $e->getMessage());
+         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
          return FALSE;
       }
    }

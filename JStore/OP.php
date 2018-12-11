@@ -89,6 +89,10 @@ abstract class OP {
       return $this->_exists($arg);
    }
 
+   function error($msg, $line = __LINE__, $file = __FILE__) {
+      error_log("$file:$line:" . get_class($this) . ", $msg");
+   }
+
    abstract protected function _write($arg);
    abstract protected function _overwrite($arg);
    abstract protected function _delete($arg);
