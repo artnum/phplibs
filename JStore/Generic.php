@@ -159,18 +159,30 @@ class Generic {
             if (! $this->request->onItem()) {
                $this->fail('Lock must have an object to lock');
             } else {
-               if (strtolower($this->request->getVerb()) != 'post') {
-                  $this->fail('Lock only have a POST inteface');
-               }
-               $lockOp = array('on' => $this->request->getItem(), 'operation' => '', 'key' => '');
-               foreach($lockOp as $k => $v) {
-                  if ($this->request->hasParameter($k)) {
-                     $lockOp[$k] = $this->request->getParameter($k);
+               if (is_string($this->lockManager) && strcasecmp($this->lockManager, 'void') === 0) {
+                  switch($this->request->getParameter('operation')) {
+                  case 'lock':
+                     $lock = array('state' => 'acquired', 'key' => '-', 'timeout' => 0, 'error' => false); break;
+                  case 'unlock':
+                     $lock = array('state' => 'unlocked', 'key' => '', 'tiemout' => 0, 'error' => false); break;
+                  default:
+                  case 'state':
+                     $lock = array('state' => 'unlocked', 'key' => '', 'tiemout' => 0, 'error' => false); break;
                   }
-               }
-               $lock = $this->lockManager->request($lockOp);
-               if (!$lock) {
-                  $this->fail('Lock module fail');
+               } else {
+                  if (strtolower($this->request->getVerb()) != 'post') {
+                     $this->fail('Lock only have a POST inteface');
+                  }
+                  $lockOp = array('on' => $this->request->getItem(), 'operation' => '', 'key' => '');
+                  foreach($lockOp as $k => $v) {
+                     if ($this->request->hasParameter($k)) {
+                        $lockOp[$k] = $this->request->getParameter($k);
+                     }
+                  }
+                  $lock = $this->lockManager->request($lockOp);
+                  if (!$lock) {
+                     $this->fail('Lock module fail');
+                  }
                }
                file_put_contents('php://output', json_encode($lock));
             }
