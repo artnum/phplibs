@@ -48,20 +48,57 @@ class SQL extends \artnum\JStore\OP {
 
    function __construct($db, $table, $id_name, $config) {
       parent::__construct($config);
-      $this->DB = $db;
+      $this->DB = array();
+      $this->RODB = array();
+      $this->RRobin = 0;
+      $this->WRRobin = 0;
       if (!is_null($db)) {
          $this->DB->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+         $this->DB[0] = $db;
       }
       $this->Config = $config;
       $this->conf('Table', $table);
       $this->conf('IDName', $id_name);
       $this->DataLayer = new Data();
    } 
-   
+
+   function add_db($db, $readonly = false) {
+      if (is_null($db)) { return; }
+      try {
+         $attr = $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+      } catch (Exception $e) {
+         error_log('Not pdo object');
+         return;
+      }
+      if ($attr) {
+         if (!$readonly) {
+            $this->DB[] = $db;
+         } else {
+            $this->RODB[] = $db;
+         }
+      }
+   }
+
    function set_db($db) {
-      $this->DB = $db;
-      if (!is_null($db)) {
-         $this->DB->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+      if (is_null($db)) { return; }
+      try {
+         $attr = $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+      } catch (Exception $e) {
+         error_log('Not pdo object');
+         return;
+      }
+      if ($attr) {
+         $this->DB[0] = $db;
+      }
+   }
+
+   function get_db($readonly = false) {
+      if ($readonly && !empty($this->RODB)) {
+         if ($this->RRobin >= count($this->RODB)) { $this->RRobin = 0; }
+         return $this->RODB[$this->RRobin++];
+      } else {
+         if ($this->WRRobin >= count($this->DB)) { $this->WRRobin = 0; }
+         return $this->DB[$this->WRRobin++];
       }
    }
 
@@ -112,7 +149,7 @@ class SQL extends \artnum\JStore\OP {
    function _delete($id) {
       if (!$this->conf('delete')) {
          try {
-            $st = $this->DB->prepare($this->req('delete'));
+            $st = $this->get_db(false)->prepare($this->req('delete'));
             $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
             $st->bindParam(':id', $id, $bind_type);
          } catch (\Exception $e) {
@@ -150,7 +187,7 @@ class SQL extends \artnum\JStore\OP {
          }
       }
       try {
-         $st = $this->DB->prepare($this->req('readMultiple', array('IDS' => implode(',', $ids))));
+         $st = $this->get_db(true)->prepare($this->req('readMultiple', array('IDS' => implode(',', $ids))));
          $data = array();
          if ($st->execute()) {
             while (($row = $st->fetch(\PDO::FETCH_ASSOC))) {
@@ -171,7 +208,7 @@ class SQL extends \artnum\JStore\OP {
 
    function get($id) {
       try {
-         $st = $this->DB->prepare($this->req('get'));
+         $st = $this->get_db(true)->prepare($this->req('get'));
          $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
          $st->bindParam(':id', $id, $bind_type);
          if($st->execute()) {
@@ -190,7 +227,7 @@ class SQL extends \artnum\JStore\OP {
 
    function getLastId($params) {
       try {
-         $st = $this->DB->prepare($this->req('getLastId'));
+         $st = $this->get_db(true)->prepare($this->req('getLastId'));
          if($st->execute()) {
             return $st->fetch(\PDO::FETCH_NUM)[0];
          }
@@ -220,7 +257,7 @@ class SQL extends \artnum\JStore\OP {
    function getTableLastMod() {
       if($this->conf('mtime')) {
          try {
-            $st = $this->DB->prepare($this->req('getTableLastMod'));
+            $st = $this->get_db(true)->prepare($this->req('getTableLastMod'));
             if($st->execute()) {
                if ($this->conf('mtime.ts')) {
                   return (int)$st->fetch(\PDO::FETCH_NUM)[0];
@@ -243,7 +280,7 @@ class SQL extends \artnum\JStore\OP {
       }
       if (!is_null($this->conf('delete'))) {
          try {
-            $st = $this->DB->prepare($this->req('getDeleteDate'));
+            $st = $this->get_db(true)->prepare($this->req('getDeleteDate'));
             if ($st) {
                $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
                $st->bindParam(':id', $item, $bind_type);
@@ -263,7 +300,7 @@ class SQL extends \artnum\JStore\OP {
    function getLastMod($item) {
       if(!is_null($this->conf('mtime'))) {
          try {
-            $st = $this->DB->prepare($this->req('getLastMod'));
+            $st = $this->get_db(true)->prepare($this->req('getLastMod'));
             if($st) {
                $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
                $st->bindParam(':id', $item, $bind_type);
@@ -397,7 +434,7 @@ class SQL extends \artnum\JStore\OP {
    function listing($options) {
       $pre_statement = $this->prepare_statement($this->req('listing'), $options);
       try { 
-         $st = $this->DB->prepare($pre_statement);
+         $st = $this->get_db(true)->prepare($pre_statement);
          if($st->execute()) {
             $data = $st->fetchAll(\PDO::FETCH_ASSOC);
             $return = array();
@@ -477,7 +514,7 @@ class SQL extends \artnum\JStore\OP {
 
    function _exists($id) {
       try {
-         $st = $this->DB->prepare($this->req('exists'));
+         $st = $this->get_db(true)->prepare($this->req('exists'));
          $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
          $st->bindParam(':id', $id, $bind_type);
          if($st->execute()) {
@@ -527,7 +564,8 @@ class SQL extends \artnum\JStore\OP {
       $values_txt = implode(',', $values);
 
       try {
-         $st = $this->DB->prepare($this->req('create', array('COLTXT' => $columns_txt, 'VALTXT' => $values_txt)));
+         $db = $this->get_db(false);
+         $st = $db->prepare($this->req('create', array('COLTXT' => $columns_txt, 'VALTXT' => $values_txt)));
          foreach($data as $k_data => &$v_data) {
             $bind_type = $this->_type($k_data, $v_data);
             if (is_null($bind_type)) {
@@ -542,20 +580,20 @@ class SQL extends \artnum\JStore\OP {
 
          $transaction = false;
          if($this->conf('auto-increment')) {
-            $this->DB->beginTransaction();
+            $db->beginTransaction();
             $transaction = true;
          }
 
          if(! $st->execute()) {
             if($transaction) {
-               $this->DB->rollback();
+               $db->rollback();
             }
 
             return FALSE;
          }
          if($this->conf('auto-increment')) {
-            $idx = $this->DB->lastInsertId($this->IDName);
-            $this->DB->commit();
+            $idx = $db->lastInsertId($this->IDName);
+            $db->commit();
             return $idx;
          } else {
             return $data[$this->IDName];
@@ -584,7 +622,8 @@ class SQL extends \artnum\JStore\OP {
       $columns_values_txt = implode(',', $columns_values);
       
       try {
-         $st = $this->DB->prepare($this->req('update', array('COLVALTXT' => $columns_values_txt)));
+         $db = $this->get_db(false);
+         $st = $db->prepare($this->req('update', array('COLVALTXT' => $columns_values_txt)));
          foreach($data as $k_data => &$v_data) {
             $bind_type = $this->_type($k_data, $v_data);
             if (is_null($bind_type)) {
