@@ -145,16 +145,17 @@ class LDAP  {
    }
 
    function prepareSearch($searches) {
-      $op = ''; $s = 0; $filter='';
+      $op = ''; $s = 0;
       if(! is_array($searches)) {
          return '(objectclass=*)';
       }
+      $filter = array();
       foreach($searches as $name => $terms) {
          if($name[0] == '_') { continue; }
          if(!is_array($terms)) {
             $terms = array($terms);
          }
-         $f = '';
+         $f = array();
          foreach($terms as $search) {
             $value = substr($search, 1);
             switch($search[0]) {
@@ -183,32 +184,60 @@ class LDAP  {
                      }
                      break;
             }
-            $f .= '(' . $op . ')'; $s++;
+            $f[] = $op; $s++;
          }
-         if(count($terms) > 1) {
+         if (count($f) == 1) {
+            $filter[$name] = $f[0];
+         } else if (count($f) > 1) {
+            $x = '';
+            foreach ($f as $_f) {
+               $x .= '(' . $_f . ')';
+            }
+            $f = $x;
             if(!isset($searches['_' . $name])) {
-               $filter .= '(&' . $f . ')';
+               $filter[$name] = '&' . $f;
             } else {
                switch(strtolower($searches['_' . $name])) {
                   default:
                   case 'and':
-                     $filter .= '(&' . $f . ')'; break;
+                     $filter[$name] = '&' . $f; break;
                   case 'or':
-                     $filter .= '(|' . $f . ')'; break;
+                     $filter[$name] = '|' . $f; break;
                }
             }
-         } else {
-            $filter .= $f;
          }
       }
-      
-      if($s == 1) {
-      } else if($s > 1) {
-         $filter = '(|' . $filter . ')';      
-      } else {
-         $filter = '(objectclass=*)';
-      }
 
+      if (isset($searches['_rules']) && is_string($searches['_rules'])) {
+         $rules = $searches['_rules'];
+         foreach ($filter as $k => $v) {
+            $rules = str_replace('_' . $k . '_', $v, $rules);
+         }
+         $filter = $rules;
+      } else {
+         foreach ($filter as &$f) {
+            $f = '(' . $f . ')';
+         }
+         if($s == 1) {
+            $filter = current($filter);
+         } else if($s > 1) {
+            $op = '|';
+            if (isset($searches['_operator'])) {
+               switch (strtolower($searches['_operator'])) {
+                  case 'or':
+                  default:
+                     $op = '|';
+                     break;
+                  case 'and':
+                     $op = '&';
+                     break;
+               }
+            }
+            $filter = '('. $op . implode('', $filter) . ')';
+         } else {
+            $filter = '(objectclass=*)';
+         }
+      }
       return $filter;
    }
 
