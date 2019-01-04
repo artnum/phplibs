@@ -207,7 +207,6 @@ class LDAP  {
             }
          }
       }
-
       if (isset($searches['_rules']) && is_string($searches['_rules'])) {
          $rules = $searches['_rules'];
          foreach ($filter as $k => $v) {
@@ -219,7 +218,8 @@ class LDAP  {
             $f = '(' . $f . ')';
          }
          if($s == 1) {
-            $filter = current($filter);
+            /* I used "current" but had troubles with on some PHP version. This seems to do the trick */
+            foreach ($filter as $v) { $filter = $v; break; }
          } else if($s > 1) {
             $op = '|';
             if (isset($searches['_operator'])) {
