@@ -324,50 +324,59 @@ class SQL extends \artnum\JStore\OP {
       $op = ''; $no_value = false; $s = array();
       foreach($searches as $name => $search) {
          if($name == '_rules') { continue; }
-         $value = substr($search, 1);
-         $no_value = false;
-         switch($search[0]) {
-            default:
-               $value = $search;
-            case '=': $op = ' = '; break;
-            case '~': $op = ' LIKE '; break;
-            case '!': $op = ' <> '; break;
-            case '-': $op = ' IS NULL'; $no_value = TRUE; break;
-            case '*': $op = ' IS NOT NULL'; $no_value = TRUE; break;
-            case '<':
-                  if($search[1] == '=') {
-                     $value = substr($value, 1);
-                     $op = ' <= ';
-                  } else {
-                     $op = ' < ';
-                  }
-                  break;
-            case '>': 
-                  if($search[1] == '=') {
-                     $value = substr($value, 1);
-                     $op = ' >= ';
-                  } else {
-                     $op = ' > ';
-                  }
-                  break;
-         }    
-         $value = trim($value); 
-
-         $fieldname = $name;
-         if (($pos = strpos($name, ':', true)) !== FALSE) {
-             $fieldname = substr($name, 0, $pos);
-         }
-
-         if($no_value) {
-            $s[$name] = $this->conf('Table') . '_' . $fieldname  . $op;
+         if (!is_array($search)) {
+            $_s = array($search);
          } else {
-            $str = $this->conf('Table') . '_' . $fieldname . $op;
-            if(is_numeric($value)) {
-               $str .= $value;
-            } else {
-               $str .= '\'' . $value . '\'';
+            $_s = $search;
+         }
+         $count = 0;
+         foreach($_s as $search) {
+            $value = substr($search, 1);
+            $no_value = false;
+            switch($search[0]) {
+               default:
+                  $value = $search;
+               case '=': $op = ' = '; break;
+               case '~': $op = ' LIKE '; break;
+               case '!': $op = ' <> '; break;
+               case '-': $op = ' IS NULL'; $no_value = TRUE; break;
+               case '*': $op = ' IS NOT NULL'; $no_value = TRUE; break;
+               case '<':
+                     if($search[1] == '=') {
+                        $value = substr($value, 1);
+                        $op = ' <= ';
+                     } else {
+                        $op = ' < ';
+                     }
+                     break;
+               case '>':
+                     if($search[1] == '=') {
+                        $value = substr($value, 1);
+                        $op = ' >= ';
+                     } else {
+                        $op = ' > ';
+                     }
+                     break;
             }
-            $s[$name] = $str;
+            $value = trim($value);
+
+            $fieldname = $name;
+            if (($pos = strpos($name, ':', true)) !== FALSE) {
+                $fieldname = substr($name, 0, $pos);
+            }
+
+            if($no_value) {
+               $s[$name . $count] = $this->conf('Table') . '_' . $fieldname  . $op;
+            } else {
+               $str = $this->conf('Table') . '_' . $fieldname . $op;
+               if(is_numeric($value)) {
+                  $str .= $value;
+               } else {
+                  $str .= '\'' . $value . '\'';
+               }
+               $s[$name . $count] = $str;
+            }
+            $count++;
          }
       }
       
