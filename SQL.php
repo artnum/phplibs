@@ -365,8 +365,11 @@ class SQL extends \artnum\JStore\OP {
                 $fieldname = substr($name, 0, $pos);
             }
 
+            if (!isset($s[$name])) {
+               $s[$name] = array();
+            }
             if($no_value) {
-               $s[$name . $count] = $this->conf('Table') . '_' . $fieldname  . $op;
+               $s[$name][$count] = $this->conf('Table') . '_' . $fieldname  . $op;
             } else {
                $str = $this->conf('Table') . '_' . $fieldname . $op;
                if(is_numeric($value)) {
@@ -374,12 +377,20 @@ class SQL extends \artnum\JStore\OP {
                } else {
                   $str .= '\'' . $value . '\'';
                }
-               $s[$name . $count] = $str;
+               $s[$name][$count] = $str;
             }
             $count++;
          }
       }
       
+      foreach($s as &$_s) {
+         if (count($_s) === 1) {
+            $_s = $_s[0];
+         } else {
+            $_s = implode(' AND ', $_s);
+         }
+      }
+
       if(count($s)>0) {
          if(! isset($searches['_rules'])) {
             return 'WHERE ' . implode(' AND ', $s);
