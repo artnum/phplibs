@@ -53,7 +53,7 @@ class SQL extends \artnum\JStore\OP {
       $this->RRobin = 0;
       $this->WRRobin = 0;
       if (!is_null($db)) {
-         $this->DB->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+         $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
          $this->DB[0] = $db;
       }
       $this->Config = $config;
