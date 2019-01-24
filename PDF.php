@@ -140,6 +140,13 @@ class PDF extends \tFPDF {
       $after = null;
       if (is_string($options)) {
          $after = $options;
+      } else if (is_array($options)) {
+         $after = $options[0];
+         foreach($options as $b) {
+            if ($this->blocks[$after]['max-y'] < $this->blocks[$b]['max-y']) {
+               $after = $b;
+            }
+         }
       }
       $this->close_block();
       if (isset($this->blocks[$name])) {
