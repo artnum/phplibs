@@ -360,18 +360,26 @@ class SQL extends \artnum\JStore\OP {
             }
             $value = trim($value);
 
+            /* Process field name */
             $fieldname = $name;
             if (($pos = strpos($name, ':', true)) !== FALSE) {
                 $fieldname = substr($name, 0, $pos);
+            }
+            $tablename = $this->conf('Table');
+            if (strpos($fieldname, '_', true) !== FALSE) {
+               list ($tablename, $fieldname) = explode('_', $fieldname, 2);
+               $fieldname = '"' . $tablename . '"."' . $tablename . '_' . $fieldname .'"';
+            } else {
+               $fieldname = '"' . $this->conf('Table') . '"."' . $this->conf('Table') . '_' . $fieldname .'"';
             }
 
             if (!isset($s[$name])) {
                $s[$name] = array();
             }
             if($no_value) {
-               $s[$name][$count] = $this->conf('Table') . '_' . $fieldname  . $op;
+               $s[$name][$count] = $fieldname  . $op;
             } else {
-               $str = $this->conf('Table') . '_' . $fieldname . $op;
+               $str = $fieldname . $op;
                if(is_numeric($value)) {
                   $str .= $value;
                } else {
