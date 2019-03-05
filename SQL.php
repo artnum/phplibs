@@ -206,15 +206,50 @@ class SQL extends \artnum\JStore\OP {
       return array(NULL, 0);
    }
 
+   function _remove_same_value ($array) {
+      $new = array();
+      foreach ($array as $v) {
+         if (!in_array($v, $new)) {
+            $new[] = $v;
+         }
+      }
+      return $new;
+   }
+
    function get($id) {
       try {
          $st = $this->get_db(true)->prepare($this->req('get'));
          $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
          $st->bindParam(':id', $id, $bind_type);
          if($st->execute()) {
-            $data = $st->fetch(\PDO::FETCH_ASSOC);
-            if($data != FALSE) {
-               return $data;
+            $datalist = array();
+            do {
+               $data = $st->fetch(\PDO::FETCH_ASSOC);
+               if ($data !== FALSE) { $datalist[] = $this->unprefix($data); }
+            } while ($data !== FALSE);
+
+            if (count($datalist) === 1) {
+               return $datalist[0];
+            } else if(count($datalist) > 1) {
+               $entry = array();
+               foreach ($datalist as $d) {
+                  foreach ($d as $k => $v) {
+                     if (!isset($entry[$k])) {
+                        $entry[$k] = array($v);
+                     } else {
+                        $entry[$k][] = $v;
+                     }
+                  }
+               }
+
+               foreach ($entry as $k => $v) {
+                  $v = $this->_remove_same_value($entry[$k]);
+                  if (count($v) === 1) {
+                     $v = $v[0];
+                  }
+                  $entry[$k] = $v;
+               }
+               return $entry;
             }
          }
       } catch (\Exception $e) {
@@ -460,6 +495,7 @@ class SQL extends \artnum\JStore\OP {
    }
 
    function listing($options) {
+      $ids = array();
       $pre_statement = $this->prepare_statement($this->req('listing'), $options);
       try { 
          $st = $this->get_db(true)->prepare($pre_statement);
@@ -467,8 +503,12 @@ class SQL extends \artnum\JStore\OP {
             $data = $st->fetchAll(\PDO::FETCH_ASSOC);
             $return = array();
             foreach($data as $d) {
-               $x = $this->unprefix($this->get($d[$this->IDName]));
-               $return[] = $this->_postprocess($x);
+               if (!in_array($d[$this->IDName], $ids)) {
+                  $id = $d[$this->IDName];
+                  $x = $this->get($d[$this->IDName]);
+                  $return[] = $this->_postprocess($x);
+                  $ids[] = $id;
+               }
             }
             return array($return, count($return));
          }
@@ -534,7 +574,7 @@ class SQL extends \artnum\JStore\OP {
    function _read($id) {
       $entry = $this->get($id);
       if($entry) {
-         $unprefixed = $this->unprefix($entry);
+         $unprefixed = $entry;
          return array($this->_postprocess($unprefixed), 1);
       }
       return array(NULL, 0);
