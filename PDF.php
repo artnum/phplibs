@@ -824,7 +824,7 @@ class PDF extends \tFPDF {
          $this->setFontSize($fontsize);
       }
 
-      $this->Line($this->lMargin, $y, $this->w - ($this->rMargin), $y);
+      $this->Line($this->lMargin, $y, ceil($this->w - $this->rMargin), $y);
       $this->br(50);
 
       if($fontsize != 0) {
