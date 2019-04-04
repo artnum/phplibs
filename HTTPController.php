@@ -108,15 +108,24 @@ class HTTPController extends \artnum\HTTP\CORS
    }
 
    function postAction($req) {
-      try {
-         $result = $this->Model->overwrite($req->getParameters());
-         if ($result) {
-            return array('success' => true, 'data' => $result, 'msg' => '');
+      if ($req->onItem() && $req->getItem() === '.search') {
+         $ret = $this->Model->search($req->getParameters());
+         if ($ret) {
+            return array('success' => true, 'msg', '', 'data' => $result);
          } else {
-            return array('success' => false, 'data' => array(NULL, 0), 'msg' => 'Write failed');
+            return array('success' => false, 'msg' => 'Generic error', 'data' => array(NULL, 0));
          }
-      } catch(Exception $e) {
-         return array('success' => false, 'data' => array(NULL, 0), 'msg' => $e->getMessage());
+      } else {
+         try {
+            $result = $this->Model->overwrite($req->getParameters());
+            if ($result) {
+               return array('success' => true, 'data' => $result, 'msg' => '');
+            } else {
+               return array('success' => false, 'data' => array(NULL, 0), 'msg' => 'Write failed');
+            }
+         } catch(Exception $e) {
+            return array('success' => false, 'data' => array(NULL, 0), 'msg' => $e->getMessage());
+         }
       }
    }
    
