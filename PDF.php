@@ -438,6 +438,10 @@ class PDF extends \tFPDF {
     $this->tabbed_align = true;
   }
 
+  function getTab($i) {
+    return $this->tabs[$i-1][0] + $this->left;
+  }
+  
   function addVTab($mm, $name = null) {
     if($name == NULL) {
       $this->vtabs[] = $mm;
@@ -667,8 +671,8 @@ class PDF extends \tFPDF {
 
   function getXYFromAL($x1, $y1, $x2, $y2) {
     /* Inverse Y coordinate to match PDF / circle coordinate */
-    $angle = rad2deg(atan2(((-$y2)-(-$y1)), ($x2 - $x1)));
-    $length = sqrt(pow($x2 - $x1, 2) + pow($y2 - $y1, 2));
+    $angle = round(rad2deg(atan2(((-$y2)-(-$y1)), ($x2 - $x1))));
+    $length = round(sqrt(pow($x2 - $x1, 2) + pow($y2 - $y1, 2)));
     return array($angle, $length);
   }
 
@@ -739,6 +743,7 @@ class PDF extends \tFPDF {
     $lineWidth = isset($options['line']) ? $options['line'] : 0.2;
     $squareSize = isset($options['square']) ? $options['square'] : 4;
     $lineType = isset($options['line-type']) ? $options['line-type'] : 'line';
+    $upTo = isset($options['up-to']) ? $options['up-to'] : null;
 
     $vertical = true;
     if(isset($options['lined']) && $options['lined']) {
@@ -759,7 +764,12 @@ class PDF extends \tFPDF {
     if($lineX != $this->left && !isset($options['length'])) {
       $lenX = $this->w - ($lineX + $this->right);
     }
-    $lenY = $stopY = $startY + $height;
+
+    if (is_null($upTo)) {
+      $stopY = $startY + $height;
+    } else {
+      $stopY = $upTo;
+    }
 
     $border = false;
     if((isset($options['border']) && $options['border']) || (isset($options['skip']) && $options['skip'])) {
