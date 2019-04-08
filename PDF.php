@@ -48,7 +48,7 @@ class PDF extends \tFPDF {
   protected $margin = array('left' => null, 'right' => null, 'top' => null);
 
   function __construct() {
-    parent::tFPDF();
+    parent::__construct();
     $this->add_layer('_origin');
     $this->current_layer = '_origin';
     $this->last_font_size = $this->FontSize;
