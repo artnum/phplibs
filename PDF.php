@@ -55,6 +55,9 @@ class PDF extends \tFPDF {
   }
 
   function Cell($w, $h = 0, $txt = '', $border = 0, $ln = 0, $align = '', $fill = false, $link = '') {
+    if (in_array($this->FontFamily, $this->CoreFonts)) {
+      $txt = iconv('UTF-8', 'windows-1252', $txt);
+    }
     $ret = parent::Cell($w, $h, $txt, $border, $ln, $align, $fill, $link);
     $this->_block();
     return $ret;
@@ -85,6 +88,9 @@ class PDF extends \tFPDF {
   }
 
   function MultiCell($w, $h, $txt, $border=0, $align='J', $fill=false) {
+    if (in_array($this->FontFamily, $this->CoreFonts)) {
+      $txt = iconv('UTF-8', 'windows-1252', $txt);
+    }
     $ret = parent::MultiCell($w, $h, $txt, $border, $align, $fill);
     $this->_block();
     return $ret;
