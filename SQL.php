@@ -730,8 +730,11 @@ class SQL extends \artnum\JStore\OP {
 
   function _write($data) {
     $prefixed = array();
-    $
+    $ignored = is_array($this->conf('ignored')) ? $this->conf('ignored') : array();
     foreach($data as $k => $v) {
+      if (in_array($k, $ignored)) {
+        continue;
+      }
       $prefixed[$this->conf('Table') . '_' . $k] = $v;
     }
 
