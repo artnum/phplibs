@@ -117,6 +117,7 @@ class PDF extends \tFPDF {
   function AddPage($orientation = '', $size = '', $rotation = 0) {
     $this->_flushblock();
     $ret = parent::AddPage($orientation, $size, $rotation);
+    $this->SetXY($this->lMargin, $this->tMargin);
     $this->_reinitblock();
     return $ret;
   }
@@ -734,7 +735,7 @@ class PDF extends \tFPDF {
     $prevLineWidth = $this->LineWidth;
     $prevDrawColor = $this->DrawColor;
 
-    $maxLength = isset($options['length']) ? $options['length'] : ($this->w - ($this->right + $this->left));
+    $maxLength = isset($options['length']) ? $options['length'] : ceil($this->w - ($this->right + $this->left));
     $lineWidth = isset($options['line']) ? $options['line'] : 0.2;
     $squareSize = isset($options['square']) ? $options['square'] : 4;
     $lineType = isset($options['line-type']) ? $options['line-type'] : 'line';
