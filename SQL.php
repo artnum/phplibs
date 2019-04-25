@@ -29,21 +29,22 @@ Namespace artnum;
 require('id.php');
 
 class SQL extends \artnum\JStore\OP {
-   protected $DB;
-   protected $Table;
-   protected $IDName;
-   protected $Request = array(
-      'delete' => 'DELETE FROM "\\Table" WHERE "\\IDName" = :id LIMIT 1',
-      'readMultiple' => 'SELECT * FROM "\\Table" WHERE "\\IDName" IN (\\IDS)',
-      'get' => 'SELECT * FROM "\\Table" WHERE "\\IDName" = :id',
-      'getLastId' => 'SELECT MAX("\\IDName") FROM "\\Table"',
-      'getTableLastMod' => 'SELECT MAX("\\mtime") FROM "\\Table"',
-      'getDeleteDate' => 'SELECT "\\delete" FROM "\\Table" WHERE "\\IDName" = :id',
-      'getLastMod' => 'SELECT "\\mtime" FROM "\\Table" WHERE "\\IDName" = :id',
-      'listing' => 'SELECT "\\IDName" FROM "\\Table"',
-      'exists' => 'SELECT "\\IDName" FROM "\\Table" WHERE "\\IDName" = :id',
-      'create' =>'INSERT INTO "\\Table" ( \\COLTXT ) VALUES ( \\VALTXT )',
-      'update' => 'UPDATE "\\Table" SET \\COLVALTXT WHERE "\\IDName" = :\\IDName LIMIT 1'
+  protected $DB;
+  protected $Table;
+  protected $IDName;
+  protected $Request = array(
+     'delete' => 'DELETE FROM "\\Table" WHERE "\\IDName" = :id LIMIT 1',
+     'readMultiple' => 'SELECT * FROM "\\Table" WHERE "\\IDName" IN (\\IDS)',
+     'get' => 'SELECT * FROM "\\Table" WHERE "\\IDName" = :id',
+     'getLastId' => 'SELECT MAX("\\IDName") FROM "\\Table"',
+     'getTableLastMod' => 'SELECT MAX("\\mtime") FROM "\\Table"',
+     'getDeleteDate' => 'SELECT "\\delete" FROM "\\Table" WHERE "\\IDName" = :id',
+     'getLastMod' => 'SELECT "\\mtime" FROM "\\Table" WHERE "\\IDName" = :id',
+     'listing' => 'SELECT "\\IDName" FROM "\\Table"',
+     'exists' => 'SELECT "\\IDName" FROM "\\Table" WHERE "\\IDName" = :id',
+     'create' =>'INSERT INTO "\\Table" ( \\COLTXT ) VALUES ( \\VALTXT )',
+     'update' => 'UPDATE "\\Table" SET \\COLVALTXT WHERE "\\IDName" = :\\IDName LIMIT 1',
+     'count' => 'SELECT COUNT(*) FROM \\Table'
    );
 
    function __construct($db, $table, $id_name, $config) {
@@ -460,63 +461,90 @@ class SQL extends \artnum\JStore\OP {
       }
 
       return '';
-   }
-
-   function prepareSort($sort) {
-      $o = array();
-      foreach($sort as $attr => $dir) {
-         $dir = strtoupper($dir);
-         if($dir == 'ASC' || $dir == 'DESC') {
-            $o[] = $this->conf('Table') . '_' . $attr . ' ' . $dir;
-         }
+    }
+  }
+  function prepareLimit($limit) {
+    if(ctype_digit($limit)) {
+      return ' LIMIT ' . $limit;
+    } else {
+      list($offset, $limit) = explode(',', $limit);
+      $offset = trim($offset); $limit = trim($limit);
+      if(ctype_digit($offset) && ctype_digit($limit)) {
+        return ' LIMIT ' . $limit . ' OFFSET ' . $offset;
       }
+    }
 
-      if( !empty($o)) {
-         return ' ORDER BY ' . implode(', ', $o);
+    return '';
+  }
+
+  function prepareSort($sort) {
+    $o = array();
+    foreach($sort as $attr => $dir) {
+      $dir = strtoupper($dir);
+      if($dir == 'ASC' || $dir == 'DESC') {
+        $o[] = $this->conf('Table') . '_' . $attr . ' ' . $dir;
       }
+    }
 
-      return '';
-   }
+    if( !empty($o)) {
+      return ' ORDER BY ' . implode(', ', $o);
+    }
 
-   function prepare_statement($statement, $options) {
-      if(isset($options['search']) && ! empty($options['search'])) {
-         $statement .= ' ' . $this->prepareSearch($options['search']);
+    return '';
+  }
+
+  function prepare_statement($statement, $options) {
+    if(isset($options['search']) && ! empty($options['search'])) {
+      $statement .= ' ' . $this->prepareSearch($options['search']);
+    }
+
+    if(isset($options['sort']) && ! empty($options['sort'])) {
+      $statement .= ' ' . $this->prepareSort($options['sort']);
+    }
+    
+    if(isset($options['limit']) && ! empty($options['limit'])) {
+      $statement .= ' ' . $this->prepareLimit($options['limit']);
+    }
+
+    return $statement;
+  }
+
+  function getCount ($options) {
+    if (isset($options['limit']) || ! empty($options['limit'])) {
+      unset($options['limit']);
+    }
+    $pre = $this->prepare_statement($this->req('count'), $options);
+    try {
+      $res = $this->get_db(false)->query($pre);
+      $data = $res->fetch();
+      return array($data[0], $data[0]);
+    } catch(\Exception $e) {
+      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
+      return array(NULL, 0);
+    }
+    return array(NULL, 0);
+  }
+
+  function listing($options) {
+    $ids = array();
+    $pre_statement = $this->prepare_statement($this->req('listing'), $options);
+    try {
+      $st = $this->get_db(true)->prepare($pre_statement);
+      if($st->execute()) {
+        $data = $st->fetchAll(\PDO::FETCH_ASSOC);
+        $return = array();
+        foreach($data as $d) {
+          if (!in_array($d[$this->IDName], $ids)) {
+            $id = $d[$this->IDName];
+            $x = $this->get($d[$this->IDName]);
+            $return[] = $this->_postprocess($x);
+            $ids[] = $id;
+          }
+        }
+        return array($return, count($return));
       }
-
-      if(isset($options['sort']) && ! empty($options['sort'])) {
-         $statement .= ' ' . $this->prepareSort($options['sort']);
-      }
-     
-      if(isset($options['limit']) && ! empty($options['limit'])) { 
-         $statement .= ' ' . $this->prepareLimit($options['limit']);
-      }
-
-      return $statement;
-   }
-
-   function listing($options) {
-      $ids = array();
-      $pre_statement = $this->prepare_statement($this->req('listing'), $options);
-      try { 
-         $st = $this->get_db(true)->prepare($pre_statement);
-         if($st->execute()) {
-            $data = $st->fetchAll(\PDO::FETCH_ASSOC);
-            $return = array();
-            foreach($data as $d) {
-               if (!in_array($d[$this->IDName], $ids)) {
-                  $id = $d[$this->IDName];
-                  $x = $this->get($d[$this->IDName]);
-                  $return[] = $this->_postprocess($x);
-                  $ids[] = $id;
-               }
-            }
-            return array($return, count($return));
-         }
-      } catch(\Exception $e) {
-         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-         return array(NULL, 0);
-      }
-
+    } catch(\Exception $e) {
+      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
       return array(NULL, 0);
    }
 
