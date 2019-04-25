@@ -41,9 +41,10 @@ class SQL extends \artnum\JStore\OP {
      'getDeleteDate' => 'SELECT "\\delete" FROM "\\Table" WHERE "\\IDName" = :id',
      'getLastMod' => 'SELECT "\\mtime" FROM "\\Table" WHERE "\\IDName" = :id',
      'listing' => 'SELECT "\\IDName" FROM "\\Table"',
-      'exists' => 'SELECT "\\IDName" FROM "\\Table" WHERE "\\IDName" = :id',
+     'exists' => 'SELECT "\\IDName" FROM "\\Table" WHERE "\\IDName" = :id',
      'create' =>'INSERT INTO "\\Table" ( \\COLTXT ) VALUES ( \\VALTXT )',
-     'update' => 'UPDATE "\\Table" SET \\COLVALTXT WHERE "\\IDName" = :\\IDName LIMIT 1'
+     'update' => 'UPDATE "\\Table" SET \\COLVALTXT WHERE "\\IDName" = :\\IDName LIMIT 1',
+     'count' => 'SELECT COUNT(*) FROM \\Table'
    );
 
   function __construct($db, $table, $id_name, $config) {
@@ -492,6 +493,22 @@ class SQL extends \artnum\JStore\OP {
     }
 
     return $statement;
+  }
+
+  function getCount ($options) {
+    if (isset($options['limit']) || ! empty($options['limit'])) {
+      unset($options['limit']);
+    }
+    $pre = $this->prepare_statement($this->req('count'), $options);
+    try {
+      $res = $this->get_db(false)->query($pre);
+      $data = $res->fetch();
+      return array($data[0], $data[0]);
+    } catch(\Exception $e) {
+      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
+      return array(NULL, 0);
+    }
+    return array(NULL, 0);
   }
 
   function listing($options) {

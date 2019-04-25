@@ -57,7 +57,9 @@ class HTTPController extends \artnum\HTTP\CORS
          do {
             $continue = false;
             if($req->onCollection()) {
-               $results = $this->Model->listing($req->getParameters());
+              $results = $this->Model->listing($req->getParameters());
+            } else if($req->onItem() && $req->getItem() === '.count') {
+              $results = $this->Model->getCount($req->getParameters());
             } else if($req->onItem()) {
                if (!$req->multiple) {
                   $results = $this->Model->read($req->getItem());
