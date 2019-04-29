@@ -95,7 +95,7 @@ class Auth {
             $key = $_key;
          }
          
-         if ($this->Crypto->compare($this->Crypto->hmac($this->Session->get('auth-challenge'), $key)['key'], $request->getParameter('response'))) {
+         if ($this->Crypto->compare($this->Crypto->hmac($this->Session->get('auth-challenge'), $key['key']), $request->getParameter('response'))) {
             $this->UserInterface->fail('reset', $request->getItem());
             $this->Session->set('auth-valid', true);
             return array('auth-success' => true);
