@@ -51,40 +51,49 @@ class HTTPController extends \artnum\HTTP\CORS
       }
    }
 
-   function getAction($req) {
-      $run = 0;
-      try {
-         do {
-            $continue = false;
-            if($req->onCollection()) {
-              $results = $this->Model->listing($req->getParameters());
-            } else if($req->onItem() && $req->getItem() === '.count') {
-              $results = $this->Model->getCount($req->getParameters());
-            } else if($req->onItem()) {
-               if (!$req->multiple) {
-                  $results = $this->Model->read($req->getItem());
-               } else {
-                  if (method_exists($this->Model, 'readMultiple')) {
-                     $results = $this->Model->readMultiple($req->getItem());
-                  } else {
-                     $results = array();
-                     foreach ($req->getItem() as $item) {
-                        $results[] = $this->Model->read($item);
-                     }
-                  }
-               }
+  function getAction($req) {
+    $run = 0;
+    try {
+      do {
+        $continue = false;
+        if($req->onCollection()) {
+          $results = $this->Model->listing($req->getParameters());
+        } else {
+          $skip = false;
+          $item = $req->getItem();
+          if (substr($item, 0, 1) === '.') {
+            $method = 'get' . ucfirst(strtolower(substr($item, 1)));
+            if (method_exists($this->Model, $method)) {
+              $results = $this->Model->$method($req->getParameters());
+              $skip = true;
             }
-            if($run < 15 && $req->getParameter('long') && $results[1] == 0) {
-               $continue = true;
-               sleep(1);
-               $run++;
+          }
+          if (!$skip) {
+            if (!$req->multiple) {
+              $results = $this->Model->read($req->getItem());
+            } else {
+              if (method_exists($this->Model, 'readMultiple')) {
+                $results = $this->Model->readMultiple($req->getItem());
+              } else {
+                $results = array();
+                foreach ($req->getItem() as $item) {
+                  $results[] = $this->Model->read($item);
+                }
+              }
             }
-         } while($continue);
-         return array('success' => true, 'data' =>  array($results[0], $results[1]), 'msg' => '');
-      } catch(Exception $e) {
-         return array('success' => false, 'data' => array(NULL, 0), 'msg' => $e->getMessage());
-      }
-   }
+          }
+        }
+        if($run < 15 && $req->getParameter('long') && $results[1] == 0) {
+          $continue = true;
+          sleep(1);
+          $run++;
+        }
+      } while($continue);
+      return array('success' => true, 'data' =>  array($results[0], $results[1]), 'msg' => '');
+    } catch(Exception $e) {
+      return array('success' => false, 'data' => array(NULL, 0), 'msg' => $e->getMessage());
+    }
+  }
 
    function patchAction ($req) {
       if (!$req->onCollection()) {
