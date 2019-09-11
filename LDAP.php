@@ -26,7 +26,7 @@
  */
 Namespace artnum;
 
-class LDAP extends \artnum\JStore\Op {
+class LDAP extends \artnum\JStore\OP {
   protected $DB;
   protected $Suffix;
   protected $Config;
@@ -43,7 +43,7 @@ class LDAP extends \artnum\JStore\Op {
         array_push($this->Binary, strtolower($b));
       }
     }
-
+    
     if(is_array($attributes)) {
       $this->Attribute = array();
       foreach($attributes as $attr) {
@@ -79,18 +79,17 @@ class LDAP extends \artnum\JStore\Op {
     return NULL;
   }
 
-  function get($dn) {
-    $c = $this->DB->readable();
-    $res = @ldap_read($c, $this->_dn($dn), '(objectclass=*)', $this->Attribute);
-    if($res && ldap_count_entries($c, $res) == 1) {
-      return ldap_first_entry($c, $res);
+  function get($dn, $conn) {
+    $res = @ldap_read($conn, $this->_dn($dn), '(objectclass=*)', $this->Attribute);
+    if($res && ldap_count_entries($conn, $res) == 1) {
+      return ldap_first_entry($conn, $res);
     }
     return NULL;
   }
 
   function _read($dn) {
     $c = $this->DB->readable();
-    $entry = $this->get(rawurldecode($dn));
+    $entry = $this->get(rawurldecode($dn), $c);
     if($entry) {
       $_ber = null;
       $dn = ldap_get_dn($c, $entry);
@@ -262,10 +261,142 @@ class LDAP extends \artnum\JStore\Op {
     return array($ret, count($ret));
   }
 
+  function buildDn ($rdnValue, $sub = null) {
+    $base = $this->Suffix;
+    $rdnAttr = $this->conf('rdnAttr');
+
+    if ($sub != null) {
+      if (is_array($sub)) {
+        $subTxt = join(',', $sub);
+      } else {
+        $subTxt = $sub;
+      }
+      $base = sprintf('%s,%s', $sub, $base);
+    }
+    
+    if ($base && $rdnAttr && $rdnValue) {
+      return sprintf('%s=%s,%s', $rdnAttr, $rdnValue, $base);
+    }
+    return null;
+  }
+  
+  /* when extending this should be rewritten */
+  function getRdnValue ($data) {
+    $ctx = hash_init('sha1',  HASH_HMAC, date('c'));
+    foreach ($data as $k => $v) {
+      hash_update($ctx, $k);
+      hash_update($ctx, $v);
+    }
+    return hash_final($ctx);
+  }
+  
+  function do_write ($data, $overwrite = false) {
+    $conn = $this->DB->writable();
+
+    $singleValue = $this->conf('singleValue');
+    if (!$singleValue) { $singleValue = array(); }
+
+    $binaryAttrs = $this->conf('binary');
+    if (!$binaryAttrs) { $binaryAttrs = array(); }
+
+    $attrsToBuild = $this->conf('toBuild');
+    if (!$attrsToBuild) { $attrsToBuild = array(); }
+    
+    if (isset($data['IDent'])) {
+      $entry = $this->get(rawurldecode($data['IDent']), $conn);
+      $dn = ldap_get_dn($conn, $entry);
+      $mods = array();
+      $entryVal = array();
+      $ber = null;
+      for ($attr = ldap_first_attribute($conn, $entry, $ber); $attr !== FALSE; $attr = ldap_next_attribute($conn, $entry, $ber)) {
+        $attr = strtolower($attr);
+        if (!is_array($data[$attr])) { $data[$attr] = array($data[$attr]); }
+        
+        /* decode binary attributes from base64 */
+        if (in_array($attr, $binaryAttrs)) {
+          $entryVal[$attr] = ldap_get_values_len($conn, $entry, $attr);
+          foreach ($data[$attr] as &$v) {
+            $v = base64_decode($v);
+          }
+        } else {
+          $entryVal[$attr] = ldap_get_values($conn, $entry, $attr);
+        }
+
+        if ($overwrite) {
+          if (!isset($data[$attr])) {
+            $mods[] = array('attrib' => $attr, 'modtype' => LDAP_MODIFY_BATCH_REMOVE_ALL);
+          } else {
+            $mods[] = array('attrib' => $attr, 'modtype' => LDAP_MODIFY_BATCH_REPLACE, 'values' => $data[$attr]);
+          }
+          unset($data[$attr]);
+        } else {
+          if (isset($data[$attr])) {
+            $mods[] = array('attrib' => $attr, 'modtype' => LDAP_MODIFY_BATCH_REPLACE, 'values' => $data[$attr]);
+          }
+          unset($data[$attr]);
+        }
+      }
+
+      foreach ($data as $k => $v) {
+        if ($k === 'IDent') { continue; }
+        $mods[] = array('attrib' => $k, 'modtype' => LDAP_MODIFY_BATCH_ADD, 'values' => $v);
+      }     
+      
+      foreach ($mods as $mod) {
+        if (in_array($mod['attrib'], $singleValue) &&
+            $mod['modtype'] !== LDAP_MODIFY_BATCH_REMOVE_ALL && count($mod['values']) > 1) {
+          $mod['values'] = array($mod['values'][0]);
+        }
+        switch ($mod['modtype']) {
+          case LDAP_MODIFY_BATCH_REMOVE_ALL:
+            ldap_mod_del($conn, $dn, $mod['attrib']); break;
+          case LDAP_MODIFY_BATCH_ADD:
+            ldap_mod_add($conn, $dn, array($mod['attrib'] => $mod['values'])); break;
+          case LDAP_MODIFY_BATCH_REPLACE:
+            ldap_mod_replace($conn, $dn, array($mod['attrib'] => $mod['values'])); break;
+        }
+      }
+    } else {
+      $rdnVal = $this->getRdnValue($data);
+      $dn = $this->buildDn($rdnVal);
+      $entry = array('objectclass' => $this->conf('objectclass'), $this->conf('rdnAttr') => array($rdnVal));
+      foreach ($data as $k => $v) {
+        switch ($k) {
+          case 'dn':
+          case 'IDent': continue;
+            break;
+          default:
+            if (!isset($entry[$k])) {
+              $entry[$k] = array();
+            }
+            if (in_array($k, $singleValue) && count($entry[$k]) === 1) {
+              continue;
+            }
+
+            array_push($entry[$k], $v);
+            break;
+        }
+      }
+
+      foreach ($attrsToBuild as $k => $v) {
+        $value = $v;
+        foreach ($entry as $_k => $_v) {
+          $value = str_replace('%' . $_k, $_v[0], $value);
+        }
+        $entry[$k] = array($value);
+      }
+
+      print_r($entry);
+      ldap_add($conn, $dn, $entry);
+    }
+  }
+  
   function _write ($data) {
+    $this->do_write($data);
     return null;
   }
   function _overwrite ($data) {
+    $this->do_write($data, true);
     return null;
   }
 }
