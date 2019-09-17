@@ -224,10 +224,9 @@ class SQL extends \artnum\JStore\OP {
       $st->bindParam(':id', $id, $bind_type);
       if($st->execute()) {
         $datalist = array();
-        do {
-          $data = $st->fetch(\PDO::FETCH_ASSOC);
-          if ($data !== FALSE) { $datalist[] = $this->unprefix($data); }
-        } while ($data !== FALSE);
+        while (($data = $st->fetch(\PDO::FETCH_ASSOC)) !== FALSE) {
+          $datalist[] = $this->unprefix($data);
+        }
 
         if (count($datalist) === 1) {
           return $datalist[0];
@@ -579,7 +578,13 @@ class SQL extends \artnum\JStore\OP {
 
   function _postprocess ($entry) {
     $dt = $this->conf('datetime');
+    $private = $this->conf('private') ? $this->conf('private') : [];
     foreach ($entry as $k => $v) {
+      if (in_array($k, $private)) {
+        $entry[$k] = null;
+        unset ($entry[$k]);
+        continue;
+      }
       if (is_array($dt) && in_array($k, $dt)) {
         $entry[$k] = $this->DataLayer->datetime($v);
       }
