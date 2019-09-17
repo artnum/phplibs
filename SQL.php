@@ -733,7 +733,7 @@ class SQL extends \artnum\JStore\OP {
     }
   }
 
-  function _overwrite($data) {
+  function _overwrite($data, $id = NULL) {
     $defaults = $this->conf('defaults');
     if (is_array($defaults)) {
       foreach($defaults as $k => $v) {
@@ -742,10 +742,10 @@ class SQL extends \artnum\JStore\OP {
         }
       }
     }
-    return $this->write($data);
+    return $this->write($data, $id);
   }
 
-  function _write($data) {
+  function _write($data, $id = NULL) {
     $prefixed = array();
     $ignored = is_array($this->conf('ignored')) ? $this->conf('ignored') : array();
     foreach($data as $k => $v) {

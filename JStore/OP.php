@@ -61,18 +61,18 @@ abstract class OP {
       return null;
    }
 
-   function write($arg) {
+   function write($arg, $id = NULL) {
       if ($this->conf('readonly')) {
          return false;
       }
-      return $this->_write($arg);
+      return $this->_write($arg, $id);
    }
 
-   function overwrite($arg) {
+   function overwrite($arg, $id = NULL) {
       if ($this->conf('readonly')) {
          return false;
       }
-      return $this->_overwrite($arg);
+      return $this->_overwrite($arg, $id);
    }
 
    function delete($arg) {
