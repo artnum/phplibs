@@ -363,14 +363,13 @@ class LDAP extends \artnum\JStore\OP {
       foreach ($data as $k => $v) {
         switch ($k) {
           case 'dn':
-          case 'IDent': continue;
-            break;
+          case 'IDent': break;
           default:
             if (!isset($entry[$k])) {
               $entry[$k] = array();
             }
             if (in_array($k, $singleValue) && count($entry[$k]) === 1) {
-              continue;
+              break;
             }
 
             array_push($entry[$k], $v);
