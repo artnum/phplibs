@@ -195,6 +195,11 @@ class PDF extends \tFPDF {
     }
   }
 
+  function reset_blocks() {
+    $this->close_block();
+    $this->blocks = array();
+  }
+  
   function to_block_end() {
     if ($this->current_block) {
       $this->SetY($this->blocks[$this->current_block]['max-y']);
