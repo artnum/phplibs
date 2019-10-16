@@ -98,7 +98,7 @@ class HTTPController extends \artnum\HTTP\CORS
    function patchAction ($req) {
       if (!$req->onCollection()) {
          try {
-            $result = $this->Model->write($req->getParameters());
+            $result = $this->Model->write($req->getParameters(), $req->getItem());
             if ($result) {
                return array('success' => true, 'data' => $result, 'msg' => '');
             } else {
@@ -128,7 +128,7 @@ class HTTPController extends \artnum\HTTP\CORS
          }
       } else {
          try {
-            $result = $this->Model->overwrite($req->getParameters());
+            $result = $this->Model->overwrite($req->getParameters(), $req->getItem());
             if ($result) {
                return array('success' => true, 'data' => $result, 'msg' => '');
             } else {
