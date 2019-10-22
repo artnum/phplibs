@@ -34,8 +34,7 @@ class SQL extends \artnum\JStore\OP {
   protected $IDName;
   protected $Request = array(
      'delete' => 'DELETE FROM "\\Table" WHERE "\\IDName" = :id LIMIT 1',
-     'readMultiple' => 'SELECT * FROM "\\Table" WHERE "\\IDName" IN (\\IDS)',
-     'get' => 'SELECT * FROM "\\Table" WHERE "\\IDName" = :id',
+     'get' => 'SELECT * FROM "\\Table"',
      'getLastId' => 'SELECT MAX("\\IDName") FROM "\\Table"',
      'getTableLastMod' => 'SELECT MAX("\\mtime") FROM "\\Table"',
      'getDeleteDate' => 'SELECT "\\delete" FROM "\\Table" WHERE "\\IDName" = :id',
@@ -180,33 +179,7 @@ class SQL extends \artnum\JStore\OP {
       }
     }
   }
-
-  function readMultiple ($ids) {
-    if (! ctype_digit($ids[0])) {
-      for ($i = 0; $i < count($ids); $i++) {
-        $ids[$i] = '\'' . $ids[$i] . '\'';
-      }
-    }
-    try {
-      $st = $this->get_db(true)->prepare($this->req('readMultiple', array('IDS' => implode(',', $ids))));
-      $data = array();
-      if ($st->execute()) {
-        while (($row = $st->fetch(\PDO::FETCH_ASSOC))) {
-          $row = $this->unprefix($row);
-          $row = $this->_postprocess($row);
-          $data[] = $row;
-        }
-
-        return array($data, count($data));
-      }
-    } catch(\Exception $e) {
-      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-      return array(NULL, 0);
-    }
-
-    return array(NULL, 0);
-  }
-
+  
   function _remove_same_value ($array) {
     $new = array();
     foreach ($array as $v) {
@@ -215,50 +188,6 @@ class SQL extends \artnum\JStore\OP {
       }
     }
     return $new;
-  }
-
-  function get($id) {
-    try {
-      $st = $this->get_db(true)->prepare($this->req('get'));
-      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-      $st->bindParam(':id', $id, $bind_type);
-      if($st->execute()) {
-        $datalist = array();
-        do {
-          $data = $st->fetch(\PDO::FETCH_ASSOC);
-          if ($data !== FALSE) { $datalist[] = $this->unprefix($data); }
-        } while ($data !== FALSE);
-
-        if (count($datalist) === 1) {
-          return $datalist[0];
-        } else if(count($datalist) > 1) {
-          $entry = array();
-          foreach ($datalist as $d) {
-            foreach ($d as $k => $v) {
-              if (!isset($entry[$k])) {
-                $entry[$k] = array($v);
-              } else {
-                $entry[$k][] = $v;
-              }
-            }
-          }
-
-          foreach ($entry as $k => $v) {
-            $v = $this->_remove_same_value($entry[$k]);
-            if (count($v) === 1) {
-              $v = $v[0];
-            }
-            $entry[$k] = $v;
-          }
-          return $entry;
-        }
-      }
-    } catch (\Exception $e) {
-      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-      return NULL;
-    }
-
-    return NULL;
   }
 
   function getLastId($params) {
@@ -513,7 +442,7 @@ class SQL extends \artnum\JStore\OP {
  
   function listing($options) {
     $ids = array();
-    $pre_statement = $this->prepare_statement($this->req('listing'), $options);
+    $pre_statement = $this->prepare_statement($this->req('get'), $options);
     try {
       $st = $this->get_db(true)->prepare($pre_statement);
       if($st->execute()) {
@@ -588,7 +517,7 @@ class SQL extends \artnum\JStore\OP {
   }
 
   function _read($id) {
-    $entry = $this->get($id);
+    $entry = $this->listing(array('search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)));
     if($entry) {
       $unprefixed = $entry;
       return array($this->_postprocess($unprefixed), 1);
