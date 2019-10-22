@@ -33,16 +33,15 @@ class SQL extends \artnum\JStore\OP {
   protected $Table;
   protected $IDName;
   protected $Request = array(
-     'delete' => 'DELETE FROM "\\Table" WHERE "\\IDName" = :id LIMIT 1',
+     'delete' => 'DELETE FROM "\\Table" WHERE "\\IDName" = :id',
      'get' => 'SELECT * FROM "\\Table"',
      'getLastId' => 'SELECT MAX("\\IDName") FROM "\\Table"',
      'getTableLastMod' => 'SELECT MAX("\\mtime") FROM "\\Table"',
      'getDeleteDate' => 'SELECT "\\delete" FROM "\\Table" WHERE "\\IDName" = :id',
      'getLastMod' => 'SELECT "\\mtime" FROM "\\Table" WHERE "\\IDName" = :id',
-     'listing' => 'SELECT * FROM "\\Table"',
      'exists' => 'SELECT "\\IDName" FROM "\\Table" WHERE "\\IDName" = :id',
      'create' =>'INSERT INTO "\\Table" ( \\COLTXT ) VALUES ( \\VALTXT )',
-     'update' => 'UPDATE "\\Table" SET \\COLVALTXT WHERE "\\IDName" = :\\IDName LIMIT 1',
+     'update' => 'UPDATE "\\Table" SET \\COLVALTXT WHERE "\\IDName" = :\\IDName',
      'count' => 'SELECT COUNT(*) FROM \\Table'
    );
 
@@ -518,9 +517,8 @@ class SQL extends \artnum\JStore\OP {
 
   function _read($id) {
     $entry = $this->listing(array('search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)));
-    if($entry) {
-      $unprefixed = $entry;
-      return array($this->_postprocess($unprefixed), 1);
+    if($entry[1] === 1) {
+      return array($entry[0][0], 1);
     }
     return array(NULL, 0);
   }
