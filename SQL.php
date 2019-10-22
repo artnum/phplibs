@@ -40,7 +40,7 @@ class SQL extends \artnum\JStore\OP {
      'getTableLastMod' => 'SELECT MAX("\\mtime") FROM "\\Table"',
      'getDeleteDate' => 'SELECT "\\delete" FROM "\\Table" WHERE "\\IDName" = :id',
      'getLastMod' => 'SELECT "\\mtime" FROM "\\Table" WHERE "\\IDName" = :id',
-     'listing' => 'SELECT "\\IDName" FROM "\\Table"',
+     'listing' => 'SELECT * FROM "\\Table"',
      'exists' => 'SELECT "\\IDName" FROM "\\Table" WHERE "\\IDName" = :id',
      'create' =>'INSERT INTO "\\Table" ( \\COLTXT ) VALUES ( \\VALTXT )',
      'update' => 'UPDATE "\\Table" SET \\COLVALTXT WHERE "\\IDName" = :\\IDName LIMIT 1',
@@ -510,7 +510,7 @@ class SQL extends \artnum\JStore\OP {
     }
     return array(NULL, 0);
   }
-
+ 
   function listing($options) {
     $ids = array();
     $pre_statement = $this->prepare_statement($this->req('listing'), $options);
@@ -522,8 +522,7 @@ class SQL extends \artnum\JStore\OP {
         foreach($data as $d) {
           if (!in_array($d[$this->IDName], $ids)) {
             $id = $d[$this->IDName];
-            $x = $this->get($d[$this->IDName]);
-            $return[] = $this->_postprocess($x);
+            $return[] = $this->_postprocess($this->unprefix($d));
             $ids[] = $id;
           }
         }
