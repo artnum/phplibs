@@ -31,6 +31,20 @@ class LDAPDB {
    protected $Selected;
    protected $Res;
 
+  
+  function close() {
+    foreach (array( 'ro', 'rw') as $type) {
+      foreach ($this->Res[$type] as $conn) {
+        ldap_close($conn['_']);
+      }
+    }
+    $this->Res = array('ro' => array(), 'rw' => array());
+  }
+
+  function __destruct() {
+    $this->close();
+  }
+  
    function __construct($servers) {
       if(! is_array($servers)) {
         $servers = array($servers);
