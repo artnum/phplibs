@@ -506,8 +506,11 @@ class SQL extends \artnum\JStore\OP {
 
   function _postprocess ($entry) {
     $dt = $this->conf('datetime');
-    $private = $this->conf('private') ? $this->conf('private') : [];
+    $private = $this->conf('private') ? $this->conf('private') : array();
     foreach ($entry as $k => $v) {
+      if ($this->conf('postprocess') && is_callable($this->conf('postprocess'))) {
+        $entry[$k] = $this->conf('postprocess')($k, $v);
+      }
       if (in_array($k, $private)) {
         $entry[$k] = null;
         unset ($entry[$k]);
