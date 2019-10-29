@@ -509,7 +509,7 @@ class SQL extends \artnum\JStore\OP {
     $private = $this->conf('private') ? $this->conf('private') : array();
     foreach ($entry as $k => $v) {
       if ($this->conf('postprocess') && is_callable($this->conf('postprocess'))) {
-        $entry[$k] = $this->conf('postprocess')($k, $v);
+        $entry[$k] = \call_user_func($this->conf('postprocess'), $k, $v);
       }
       if (in_array($k, $private)) {
         $entry[$k] = null;
