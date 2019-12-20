@@ -367,11 +367,15 @@ class SQL extends \artnum\JStore\OP {
       if(! isset($searches['_rules'])) {
         return 'WHERE ' . implode(' AND ', $s);
       } else {
-        $exp =  'WHERE ' . $searches['_rules'];
-        foreach($s as $k => $v) {
-          $exp = str_replace($k, $v, $exp);
+        $rule = explode(' ', $searches['_rules']);
+        foreach ($rule as &$r) {
+          if (preg_match('/([a-zA-Z0-9_]+)/', $r, $matches)) {
+            if (!empty($s[$matches[0]])) {
+              $r = str_replace($matches[0], $s[$matches[0]], $r);
+            }
+          }
         }
-        return $exp;
+        return 'WHERE ' . implode(' ', $rule);
       }
     } else {
       return '';
