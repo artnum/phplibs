@@ -513,9 +513,10 @@ class SQL extends \artnum\JStore\OP {
     $pre_statement = $this->prepare_statement($this->req('get'), $options);
     try {
       $st = $this->get_db(true)->prepare($pre_statement);
-      if($st->execute()) {
+      if(!$st->execute()) {
+        $result->addError($st->errorInfo()[2], $st->errorInfo());
+      } else{
         $data = $st->fetchAll(\PDO::FETCH_ASSOC);
-        $return = array();
         foreach($data as $d) {
           if (!in_array($d[$this->IDName], $ids)) {
             $id = $d[$this->IDName];
@@ -536,11 +537,7 @@ class SQL extends \artnum\JStore\OP {
   function _read($id) {
     $result = new \artnum\JStore\Result();
     $results = $this->listing(array('search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)));
-    if ($results->countError() > 0) {
-      foreach ($results->getError() as $e) {
-        $result->addError($e['message'], $e['data'], $e['time']);
-      }
-    }
+    $result->copyError($results);
 
     if($results->getCount() !== 1) {
       $result->addError('More than one result');

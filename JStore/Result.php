@@ -64,12 +64,18 @@ class Result {
     }
   }
 
-  function addError ($msg, $data = NULL, $time = null) {
+  function copyError ($src) {
+    $this->errors = array_merge($this->errors, $src->getError());
+  }
+  
+  function addError ($msg, $data = NULL, $time = null, $file = __FILE__, $line = __LINE__) {
     if (is_null($time)) { $time = time(); }
     array_push($this->errors, array(
       'time' => $time,
       'message' => $msg,
-      'data' => $data
+      'data' => $data,
+      'file' => $file,
+      'line' => $line
     ));
   }
 
