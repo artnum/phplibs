@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2018 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2018-2020 Etienne Bagnoud <etienne@artisan-numerique.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -277,8 +277,20 @@ class Generic {
                $results = array('success' => false, 'type' => 'results', 'data' => null, 'length' => 0);
                $action = strtolower($this->request->getVerb()) . 'Action';
                $results = $controller->$action($this->request);
+               if ($results['success']) {
+                 $results['msg'] = 'OK';
+               }
                switch(strtolower($this->request->getVerb())) {
-                  default:
+                 default:
+                   if (isset($results['result'])) {
+                     $body = json_encode(array(
+                       'success' => $results['success'],
+                       'type' => 'results',
+                       'message' => $results['msg'],
+                       'data' => $results['result']->getItems(),
+                       'length' => $results['result']->getCount()
+                     ));
+                   } else {
                      $body = json_encode(array(
                         'success' => $results['success'],
                         'type' => 'results',
@@ -286,11 +298,16 @@ class Generic {
                         'data' => $results['data'][0],
                         'length' => $results['data'][1]
                      ));
+                   }
                      $hash = $this->crypto->hash($body);
 
-                     if ($this->request->getClientReqId()) {
-                        header('X-Request-ID: ' . $this->request->getClientReqId());
+                     $reqId = $this->request->getClientReqId();
+                     if ($reqId) {
+                        header('X-Request-ID: ' . $reqId);
+                     } else {
+                       $reqId = '';
                      }
+
                      header('X-Artnum-hash: ' . $hash[0]);
                      header('X-Artnum-hash-algo: ' . $hash[1]);
                      if (!is_null($this->signature)) {
@@ -300,6 +317,13 @@ class Generic {
                      }
                      $this->_t();
                      file_put_contents('php://output', $body);
+                     if (isset($results['result'])) {
+                       if ($results['result']->countError() > 0) {
+                          foreach ($results['result']->getError() as $error) {
+                             error_log(sprintf('ReqID %s@%d: +%s+', $reqId, $error['time'], addslashes($error['message'])), 0); 
+                          }
+                        }
+                     }
                      break;
                   case 'head':
                      foreach($results as $k => $v) {
@@ -345,7 +369,5 @@ class Generic {
       file_put_contents('php://output', $body);
       exit(-1); 
    }
-
-
 }
 ?>

@@ -442,31 +442,6 @@ class SQL extends \artnum\JStore\OP {
     }
     return array(NULL, 0);
   }
- 
-  function listing($options) {
-    $ids = array();
-    $pre_statement = $this->prepare_statement($this->req('get'), $options);
-    try {
-      $st = $this->get_db(true)->prepare($pre_statement);
-      if($st->execute()) {
-        $data = $st->fetchAll(\PDO::FETCH_ASSOC);
-        $return = array();
-        foreach($data as $d) {
-          if (!in_array($d[$this->IDName], $ids)) {
-            $id = $d[$this->IDName];
-            $return[] = $this->_postprocess($this->unprefix($d));
-            $ids[] = $id;
-          }
-        }
-        return array($return, count($return));
-      }
-    } catch(\Exception $e) {
-      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-      return array(NULL, 0);
-    }
-
-    return array(NULL, 0);
-  }
 
   function unprefix($entry, $table = NULL) {
     $nullTable = array();
@@ -528,12 +503,52 @@ class SQL extends \artnum\JStore\OP {
     return $entry;
   }
 
-  function _read($id) {
-    $entry = $this->listing(array('search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)));
-    if($entry[1] === 1) {
-      return array($entry[0][0], 1);
+  function extendEntry ($entry, &$result) {
+    return $entry;
+  }
+  
+  function listing($options) {
+    $result = new \artnum\JStore\Result();
+    $ids = array();
+    $pre_statement = $this->prepare_statement($this->req('get'), $options);
+    try {
+      $st = $this->get_db(true)->prepare($pre_statement);
+      if($st->execute()) {
+        $data = $st->fetchAll(\PDO::FETCH_ASSOC);
+        $return = array();
+        foreach($data as $d) {
+          if (!in_array($d[$this->IDName], $ids)) {
+            $id = $d[$this->IDName];
+            $d = $this->_postprocess($this->unprefix($d));
+            $d = $this->extendEntry($d, $result);
+            $result->addItem($d);
+            $ids[] = $id;
+          }
+        }
+      }
+    } catch(\Exception $e) {
+      $result->addError($e->getMessage(), $e);
     }
-    return array(NULL, 0);
+
+    return $result;
+  }
+
+  function _read($id) {
+    $result = new \artnum\JStore\Result();
+    $results = $this->listing(array('search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)));
+    if ($results->countError() > 0) {
+      foreach ($results->getError() as $e) {
+        $result->addError($e['message'], $e['data'], $e['time']);
+      }
+    }
+
+    if($results->getCount() !== 1) {
+      $result->addError('More than one result');
+    } else {
+      $result->setItems($results->getItems()[0]);
+      $result->setCount(1);
+    }
+    return $result;
   }
 
   function _exists($id) {
@@ -685,6 +700,7 @@ class SQL extends \artnum\JStore\OP {
   }
 
   function _write($data, $id = NULL) {
+    $result = new \artnum\JStore\Result();
     $prefixed = array();
     $ignored = is_array($this->conf('ignored')) ? $this->conf('ignored') : array();
     foreach($data as $k => $v) {
@@ -715,10 +731,12 @@ class SQL extends \artnum\JStore\OP {
           $prefixed[$this->conf('create')] = time();
         }
       }
-      return array(array(array('id' => $this->create($prefixed))), 1);
+      $result->addItem(array('id' => $this->create($prefixed)));
     } else {
-      return array(array(array('id' => $this->update($prefixed))), 1);
+      $result->addItem(array('id' => $this->update($prefixed)));
     }
+
+    return $result;
   }
 
   function uid($data) {
