@@ -65,7 +65,9 @@ class Result {
   }
 
   function copyError ($src) {
-    $this->errors = array_merge($this->errors, $src->getError());
+    if ($src instanceof \artnum\JStore\Result) {
+      $this->errors = array_merge($this->errors, $src->getError());
+    }
   }
   
   function addError ($msg, $data = NULL, $time = null, $file = __FILE__, $line = __LINE__) {
