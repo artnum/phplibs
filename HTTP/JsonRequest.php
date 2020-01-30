@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2017 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2017 - 2020 Etienne Bagnoud <etienne@artnum.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,246 +28,246 @@ Namespace artnum\HTTP;
 
 class JsonRequest extends Path
 {
-   public $parameters;
-   public $verb;
-   public $protocol;
-   public $client;
-   public $multiple;
-   public $items;
-   public $clientReqId = null;
-   private $hashCtx;
+  public $parameters;
+  public $verb;
+  public $protocol;
+  public $client;
+  public $multiple;
+  public $items;
+  public $clientReqId = null;
+  private $hashCtx;
 
-   function __construct()
-   {
-      parent::__construct();
+  function __construct()
+  {
+    parent::__construct();
 
-      /* this work with Collection/Item only. Item as a path is useful, so
-       * join back Collection/i/t/em into [Collection][i/t/ek]
+    /* this work with Collection/Item only. Item as a path is useful, so
+     * join back Collection/i/t/em into [Collection][i/t/ek]
+     */
+    if (count($this->url_elements) > 2) {
+      $collection = array_shift($this->url_elements);
+      $item = implode('/', $this->url_elements);
+      $this->url_elements = array($collection, $item);
+    }
+
+    $_algos = hash_algos();
+    foreach (array('md5', 'sha1', 'tiger128', 'haval192') as $h) {
+      if (in_array($h, $_algos)) {
+        $this->hashCtx = hash_init($h);
+        break;
+      }
+    }
+
+    $this->multiple = false;
+    $this->items = array();
+    $this->verb = $_SERVER['REQUEST_METHOD'];
+    $this->protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
+    $this->client = $_SERVER['REMOTE_ADDR'];
+
+    hash_update($this->hashCtx, $this->verb);
+    hash_update($this->hashCtx, $this->protocol);
+    hash_update($this->hashCtx, $this->client);
+
+    $this->parseParams();
+
+    if ($this->onItem()) {
+      if ($this->getItem()[0] == '|') {
+        $this->items = explode('|', substr($this->getItem(), 1));
+        $this->multiple = true;
+      }
+    }
+
+    if (isset($_SERVER['HTTP_X_ARTNUM_REQID'])) {
+      hash_update($this->hashCtx, $_SERVER['HTTP_X_ARTNUM_REQID']);
+      $this->clientReqId = $_SERVER['HTTP_X_ARTNUM_REQID'];
+    }
+
+    if (isset($_SERVER['HTTP_X_REQUEST_ID'])) {
+      hash_update($this->hashCtx, $_SERVER['HTTP_X_REQUEST_ID']);
+      $this->clientReqId = $_SERVER['HTTP_X_REQUEST_ID'];
+    }
+
+    $this->reqid = hash_final($this->hashCtx);
+  }
+
+  function getId() {
+    return $this->reqid;
+  }
+
+  function getClient()  {
+    return $this->client;
+  }
+
+  function getProtocol() {
+    return $this->protocol;
+  }
+
+  function getVerb() {
+    return $this->verb;
+  }
+
+  function getClientReqId() {
+    return is_null($this->clientReqId) ? false : base64_encode($this->clientReqId);
+  }
+
+  function onCollection() {
+    if(count($this->url_elements) == 1) return true;
+    return false;
+    
+  }
+
+  function onItem() {
+    if(count($this->url_elements) == 2) return true;
+    return false;
+  }
+
+  function getItem() {
+    if ($this->onItem()) {
+      if ($this->multiple) {
+        return $this->items;
+      } else {
+        return $this->url_elements[1];
+      }
+    }
+    return NULL; 
+  }
+
+  function getCollection() {
+    if($this->onCollection() or $this->onItem()) return $this->url_elements[0];
+    return NULL;
+  }
+  
+  function hasParameters()
+  {
+    if(count($this->parameters) > 0) return true;
+    return false;
+  }
+
+  function hasParameter($name) {
+    if(isset($this->parameters[$name])) {
+      return true;
+    }
+    return false;
+  }
+
+  function getParameter($name) {
+    if($this->hasParameter($name)) {
+      return $this->parameters[$name];
+    }
+    return NULL;
+  }
+
+  function getParameters() {
+    return $this->parameters;
+  }
+
+  function setParameter($name, $value) {
+    $this->parameters[$name] = $value;
+  }
+
+  function _parse_str($str) {
+    $arr = array();
+
+    if(empty($str)) return array();
+
+    $pairs = explode('&', $str);
+    
+    if($pairs == FALSE) return array();
+    if(empty($pairs)) return array();
+    
+    foreach ($pairs as $i) { 
+      list($name,$value) = explode('=', $i, 2);
+      
+      $name = urldecode($name);
+      $value = urldecode($value);
+
+      if (strcmp($name, '_qid') === 0) {
+        $this->clientReqId = $value;
+        continue;
+      }
+
+      /* Special case. When item is identified by a path ( /my/item/id ), a parameter name '!' can be used :
+         https://example.com/store/Collection/?!=/my/item/id
        */
-      if (count($this->url_elements) > 2) {
-         $collection = array_shift($this->url_elements);
-         $item = implode('/', $this->url_elements);
-         $this->url_elements = array($collection, $item);
+      if($name == '!') {
+        $this->url_elements[] = $value;
+        continue;
       }
 
-      $_algos = hash_algos();
-      foreach (array('md5', 'sha1', 'tiger128', 'haval192') as $h) {
-         if (in_array($h, $_algos)) {
-            $this->hashCtx = hash_init($h);
-            break;
-         }
+      /* also deal with php array */
+      $name = str_replace(array('[', ']'), '', $name);
+
+      $group = '';
+      if(strstr($name, '.')) {
+        list ($group, $name) = explode('.', $name, 2);
       }
 
-      $this->multiple = false;
-      $this->items = array();
-      $this->verb = $_SERVER['REQUEST_METHOD'];
-      $this->protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
-      $this->client = $_SERVER['REMOTE_ADDR'];
+      $ref =& $arr;
+      if(!empty($group)) {
+        
+        if(!isset($arr[$group])) { 
+          $arr[$group] = array();
+        }
 
-      hash_update($this->hashCtx, $this->verb);
-      hash_update($this->hashCtx, $this->protocol);
-      hash_update($this->hashCtx, $this->client);
-
-      $this->parseParams();
-
-      if ($this->onItem()) {
-         if ($this->getItem()[0] == '|') {
-            $this->items = explode('|', substr($this->getItem(), 1));
-            $this->multiple = true;
-         }
+        $ref =& $arr[$group];
       }
 
-      if (isset($_SERVER['HTTP_X_ARTNUM_REQID'])) {
-         hash_update($this->hashCtx, $_SERVER['HTTP_X_ARTNUM_REQID']);
-         $this->clientReqId = $_SERVER['HTTP_X_ARTNUM_REQID'];
-      }
+      if( isset($ref[$name]) ) { 
+        if( is_array($ref[$name]) ) { 
+          $ref[$name][] = $value; 
+        } else { 
+          $ref[$name] = array($ref[$name], $value); 
+        } 
+      } else { 
+        $ref[$name] = $value; 
+      } 
+    }
 
-      if (isset($_SERVER['HTTP_X_REQUEST_ID'])) {
-         hash_update($this->hashCtx, $_SERVER['HTTP_X_REQUEST_ID']);
-         $this->clientReqId = $_SERVER['HTTP_X_REQUEST_ID'];
-      }
+    return $arr; 
+  }
 
-      $this->reqid = hash_final($this->hashCtx);
-   }
+  function parseParams()
+  {
+    $params = array();
 
-   function getId() {
-      return $this->reqid;
-   }
+    if(isset($_SERVER['QUERY_STRING'])) {
+      hash_update($this->hashCtx, $_SERVER['QUERY_STRING']);
+      $params = $this->_parse_str($_SERVER['QUERY_STRING']);
+    }
 
-   function getClient()  {
-      return $this->client;
-   }
+    $content = file_get_contents('php://input');
 
-   function getProtocol() {
-      return $this->protocol;
-   }
-
-   function getVerb() {
-      return $this->verb;
-   }
-
-   function getClientReqId() {
-      return is_null($this->clientReqId) ? false : base64_encode($this->clientReqId);
-   }
-
-   function onCollection() {
-      if(count($this->url_elements) == 1) return true;
-      return false;
-     
-   }
-
-   function onItem() {
-      if(count($this->url_elements) == 2) return true;
-      return false;
-   }
-
-   function getItem() {
-      if ($this->onItem()) {
-         if ($this->multiple) {
-            return $this->items;
-         } else {
-            return $this->url_elements[1];
-         }
-      }
-      return NULL; 
-   }
-
-   function getCollection() {
-      if($this->onCollection() or $this->onItem()) return $this->url_elements[0];
-      return NULL;
-   }
-   
-   function hasParameters()
-   {
-      if(count($this->parameters) > 0) return true;
-      return false;
-   }
-
-   function hasParameter($name) {
-      if(isset($this->parameters[$name])) {
-         return true;
-      }
-      return false;
-   }
-
-   function getParameter($name) {
-      if($this->hasParameter($name)) {
-         return $this->parameters[$name];
-      }
-      return NULL;
-   }
-
-   function getParameters() {
-      return $this->parameters;
-   }
-
-   function setParameter($name, $value) {
-      $this->parameters[$name] = $value;
-   }
-
-   function _parse_str($str) {
-      $arr = array();
-
-      if(empty($str)) return array();
-
-      $pairs = explode('&', $str);
-      
-      if($pairs == FALSE) return array();
-      if(empty($pairs)) return array();
-      
-      foreach ($pairs as $i) { 
-         list($name,$value) = explode('=', $i, 2);
-         
-         $name = urldecode($name);
-         $value = urldecode($value);
-
-         if (strcmp($name, '_qid') === 0) {
-            $this->clientReqId = $value;
-            continue;
-         }
-
-         /* Special case. When item is identified by a path ( /my/item/id ), a parameter name '!' can be used :
-               https://example.com/store/Collection/?!=/my/item/id
-          */
-         if($name == '!') {
-            $this->url_elements[] = $value;
-            continue;
-         }
-
-         /* also deal with php array */
-         $name = str_replace(array('[', ']'), '', $name);
-
-         $group = '';
-         if(strstr($name, '.')) {
-            list ($group, $name) = explode('.', $name, 2);
-         }
-
-         $ref =& $arr;
-         if(!empty($group)) {
-         
-            if(!isset($arr[$group])) { 
-               $arr[$group] = array();
+    if($content != FALSE) {
+      hash_update($this->hashCtx, $content);
+      if(isset($_SERVER['CONTENT_TYPE']) && strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
+        foreach($this->_parse_str($content) as $_k => $_v) {
+          if(!empty($params[$_k])) {
+            if(is_array($params[$_k])) {
+              $params[$_k][] = $_v;
+            } else {
+              $params[$_k] = array($params[$_k], $_v);
             }
-
-            $ref =& $arr[$group];
-         }
-
-         if( isset($ref[$name]) ) { 
-            if( is_array($ref[$name]) ) { 
-               $ref[$name][] = $value; 
-            } else { 
-               $ref[$name] = array($ref[$name], $value); 
-            } 
-         } else { 
-            $ref[$name] = $value; 
-         } 
-      }
-
-      return $arr; 
-   }
-
-   function parseParams()
-   {
-      $params = array();
-
-      if(isset($_SERVER['QUERY_STRING'])) {
-         hash_update($this->hashCtx, $_SERVER['QUERY_STRING']);
-         $params = $this->_parse_str($_SERVER['QUERY_STRING']);
-      }
-
-      $content = file_get_contents('php://input');
-
-      if($content != FALSE) {
-         hash_update($this->hashCtx, $content);
-         if(isset($_SERVER['CONTENT_TYPE']) && strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
-            foreach($this->_parse_str($content) as $_k => $_v) {
-               if(!empty($params[$_k])) {
-                  if(is_array($params[$_k])) {
-                     $params[$_k][] = $_v;
-                  } else {
-                     $params[$_k] = array($params[$_k], $_v);
-                  }
-               } else {
-                  $params[$_k] = $_v;
-               }
+          } else {
+            $params[$_k] = $_v;
+          }
+        }
+      }  else {
+        $json_root = json_decode($content, true);
+        if($json_root) {
+          foreach($json_root as $_k => $_v) {
+            if (strcmp($_k, '_qid') === 0) {
+              if (is_string($_v)) {
+                $this->clientReqId = $_v;
+              }
+              continue;
             }
-         }  else {
-            $json_root = json_decode($content, true);
-            if($json_root) {
-               foreach($json_root as $_k => $_v) {
-                  if (strcmp($_k, '_qid') === 0) {
-                     if (is_string($_v)) {
-                        $this->clientReqId = $_v;
-                     }
-                     continue;
-                  }
-                  $params[$_k] = $_v;
-               }         
-            }
-         }
+            $params[$_k] = $_v;
+          }         
+        }
       }
-      
-      $this->parameters = $params;
-   }
+    }
+    
+    $this->parameters = $params;
+  }
 }
 ?>
