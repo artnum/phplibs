@@ -128,8 +128,12 @@ class HTTPController extends \artnum\HTTP\CORS
         $result = $this->Model->write($req->getParameters(), $req->getItem());
         if ($result) {
           $retVal['success'] = true;
-          $retVal['result']->setItems($result[0]);
-          $retVal['result']->setCount($result[1]);
+          if (is_array($result)) {
+            $retVal['result']->setItems($result[0]);
+            $retVal['result']->setCount($result[1]);
+          } else {
+            $retVal['result'] = $result;
+          }
         } else {
           $retVal['msg'] = 'Write failed';
         }
