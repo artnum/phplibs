@@ -40,14 +40,14 @@ class LDAP extends \artnum\JStore\OP {
 
     if(is_array($this->Config['binary'])) {
       foreach($this->Config['binary'] as $b) {
-        array_push($this->Binary, strtolower($b));
+        $this->Binary[] = strtolower($b);
       }
     }
     
     if(is_array($attributes)) {
       $this->Attribute = array();
       foreach($attributes as $attr) {
-        array_push($this->Attribute, strtolower($attr));
+        $this->Attribute[] = strtolower($attr);
       }
     } else {
       $this->Attribute = NULL;
@@ -235,7 +235,7 @@ class LDAP extends \artnum\JStore\OP {
         if (in_array($attr, $this->Binary)) {
           $val = ldap_get_values_len($conn, $ldapEntry, $attr);
           for ($i = 0; $i < $val['count']; $i++) {
-            array_push($value, base64_encode($val[$i]));
+            $value[] = base64_encode($val[$i]);
           }
         } else {
           $val = ldap_get_values($conn, $ldapEntry, $attr);
@@ -382,7 +382,7 @@ class LDAP extends \artnum\JStore\OP {
               break;
             }
 
-            array_push($entry[$k], $v);
+            $entry[$k][] = $v;
             break;
         }
       }

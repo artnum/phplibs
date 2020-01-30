@@ -59,7 +59,7 @@ class Result {
       $this->count = 0;
     }
     if (is_array($this->items)) {
-      array_push($this->items, $item);
+      $this->items[] = $item;
       $this->count++;
     }
   }
@@ -72,13 +72,13 @@ class Result {
   
   function addError ($msg, $data = NULL, $time = null, $file = __FILE__, $line = __LINE__) {
     if (is_null($time)) { $time = time(); }
-    array_push($this->errors, array(
+    $this->errors[] = array(
       'time' => $time,
       'message' => $msg,
       'data' => $data,
       'file' => $file,
       'line' => $line
-    ));
+    );
   }
 
   function countError () {

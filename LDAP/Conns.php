@@ -42,7 +42,7 @@ class Conns {
             if($ro) { $dst = 'ro'; }
       
             $this->_set_protocol($conn, $dse);      
-            array_push($this->conns[$dst], array('conn' => $conn, 'dse' => $dse, 'uri' => $uri, 'ro' => $ro)); 
+            $this->conns[$dst][] = array('conn' => $conn, 'dse' => $dse, 'uri' => $uri, 'ro' => $ro); 
          }
       }
    }
@@ -89,7 +89,7 @@ class Conns {
             if(isset($dse['namingcontexts'])) {
                for($i = 0; $i < $dse['namingcontexts']['count']; $i++) {
                   if(strcmp($base, $dse['namingcontexts'][$i]) == 0) {
-                     array_push($r, $c);
+                    $r[] = $c;
                   }
                }
             }
