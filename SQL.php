@@ -284,6 +284,26 @@ class SQL extends \artnum\JStore\OP {
     return '0';
   }
 
+  function sqlFunction ($function, $arguments, $operator) {
+    $argc = count($arguments);
+    switch ($function) {
+        /* return part of string. index (arg 1) is at 0 instead of 1 as in mysql */
+      case 'substr':
+        if ($argc < 1 || $argc > 2) { return FALSE; }
+        if (!ctype_digit($arguments[0])) { return FALSE; }
+        if ($argc == 1) {
+          return sprintf('SUBSTR(__FIELDNAME__, 0, %d) %s __VALUE__', intval($arguments[0]) + 1, $operator);
+        } else {
+          if (!ctype_digit($arguments[1])) { return FALSE; }
+          return sprintf('SUBSTR(__FIELDNAME__, %d, %d) %s __VALUE__', intval($arguments[0]) + 1, intval($arguments[1]), $operator);
+        }        
+      case 'left':
+      case 'right':
+        if ($argc != 1 || !ctype_digit($arguments[0])) { return FALSE; }
+        return sprintf('%s(__FIELDNAME__, %d) %s __VALUE__', strtoupper($function), intval($arguments[0]), $operator);
+    }
+  }
+  
   function prepareSearch($searches) {
     $op = ''; $no_value = false; $s = array();
     foreach($searches as $name => $search) {
@@ -296,29 +316,40 @@ class SQL extends \artnum\JStore\OP {
       $count = 0;
       foreach($_s as $search) {
         $value = substr($search, 1);
-        $no_value = false;
         switch($search[0]) {
+          case '@':
+            if (!preg_match('/^@(\w+)\[(.*)\]((?:=|<=|>=|<>|!=|<|>))(.*)$/', $search, $matches)) {
+              $value = $search;
+            } else {
+              $function = strtolower($matches[1]);
+              $arguments = array_map('trim', explode(',', $matches[2]));
+              $operator = $matches[3];
+              $value = $matches[4];
+              $op = $this->sqlFunction($function, $arguments, $operator);
+              if ($op === FALSE) { $value = $search; }
+            }
+            break;
           default:
             $value = $search;
-          case '=': $op = ' = '; break;
-          case '~': $op = ' LIKE '; break;
-          case '!': $op = ' <> '; break;
-          case '-': $op = ' IS NULL'; $no_value = TRUE; break;
-          case '*': $op = ' IS NOT NULL'; $no_value = TRUE; break;
+          case '=': $op = '__FIELDNAME__ = __VALUE__'; break;
+          case '~': $op = '__FIELDNAME__ LIKE __VALUE__'; break;
+          case '!': $op = '__FIELDNAME__ <> __VALUE__'; break;
+          case '-': $op = '__FIELDNAME__ IS NULL'; break;
+          case '*': $op = '__FIELDNAME__ IS NOT NULL'; break;
           case '<':
             if($search[1] == '=') {
               $value = substr($value, 1);
-              $op = ' <= ';
+              $op = '__FIELDNAME__ <= __VALUE__';
             } else {
-              $op = ' < ';
+              $op = '__FIELDNAME__ < __VALUE__';
             }
             break;
           case '>':
             if($search[1] == '=') {
               $value = substr($value, 1);
-              $op = ' >= ';
+              $op = '__FIELDNAME__ >= __VALUE__';
             } else {
-              $op = ' > ';
+              $op = '__FIELDNAME__ > __VALUE__';
             }
             break;
         }
@@ -340,17 +371,8 @@ class SQL extends \artnum\JStore\OP {
         if (!isset($s[$name])) {
           $s[$name] = array();
         }
-        if($no_value) {
-          $s[$name][$count] = $fieldname  . $op;
-        } else {
-          $str = $fieldname . $op;
-          if(is_numeric($value)) {
-            $str .= $value;
-          } else {
-            $str .= '\'' . $value . '\'';
-          }
-          $s[$name][$count] = $str;
-        }
+
+        $s[$name][$count] = str_replace('__VALUE__', is_numeric($value) ? $value : '\'' . $value . '\'', str_replace('__FIELDNAME__', $fieldname, $op));
         $count++;
       }
     }
@@ -412,23 +434,22 @@ class SQL extends \artnum\JStore\OP {
   }
 
   function prepare_statement($statement, $options) {
-    if(isset($options['search']) && ! empty($options['search'])) {
-      $statement .= ' ' . $this->prepareSearch($options['search']);
+    if(! empty($options['search']) || !empty($options['s'])) {
+      $statement .= ' ' . $this->prepareSearch(empty($options['search']) ? $options['s'] : $options['search']);
     }
 
-    if(isset($options['sort']) && ! empty($options['sort'])) {
+    if(! empty($options['sort'])) {
       $statement .= ' ' . $this->prepareSort($options['sort']);
     }
     
-    if(isset($options['limit']) && ! empty($options['limit'])) {
+    if(! empty($options['limit'])) {
       $statement .= ' ' . $this->prepareLimit($options['limit']);
     }
-
     return $statement;
   }
 
   function getCount ($options) {
-    if (isset($options['limit']) || ! empty($options['limit'])) {
+    if (! empty($options['limit'])) {
       unset($options['limit']);
     }
     $pre = $this->prepare_statement($this->req('count'), $options);
@@ -720,7 +741,7 @@ class SQL extends \artnum\JStore\OP {
       $prefixed[$this->conf('delete')] = NULL;
     }
 
-    if(!isset($prefixed[$this->IDName]) || empty($prefixed[$this->IDName])) {
+    if(empty($prefixed[$this->IDName])) {
       if (!is_null($this->conf('create'))) {
         if (!$this->conf('create.ts')) {
           $prefixed[$this->conf('create')] = $this->DataLayer->datetime(time());
@@ -728,9 +749,9 @@ class SQL extends \artnum\JStore\OP {
           $prefixed[$this->conf('create')] = time();
         }
       }
-      $result->addItem(array('id' => $this->create($prefixed)));
+      $result->addItem(['id' => $this->create($prefixed)]);
     } else {
-      $result->addItem(array('id' => $this->update($prefixed)));
+      $result->addItem(['id' => $this->update($prefixed)]);
     }
 
     return $result;
