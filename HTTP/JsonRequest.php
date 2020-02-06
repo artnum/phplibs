@@ -51,13 +51,8 @@ class JsonRequest extends Path
       $this->url_elements = array($collection, $item);
     }
 
-    $_algos = hash_algos();
-    foreach (array('md5', 'sha1', 'tiger128', 'haval192') as $h) {
-      if (in_array($h, $_algos)) {
-        $this->hashCtx = hash_init($h);
-        break;
-      }
-    }
+    /* fix algo to sha256 */
+    $this->hashCtx = hash_init('sha256');
 
     $this->multiple = false;
     $this->items = array();
@@ -84,19 +79,25 @@ class JsonRequest extends Path
           /* use X-Request-Id if available, X-Artnum-ReqID is obsolete */
           if (!empty($_SERVER['HTTP_X_REQUEST_ID'])) { break; } 
         case 'HTTP_X_REQUEST_ID':
-          hash_update($this->hashCtx, $_SERVER['HTTP_X_ARTNUM_REQID']);
-          $this->clientReqId = $_SERVER['HTTP_X_ARTNUM_REQID'];
+          hash_update($this->hashCtx, 'X-Request-Id: '. $_SERVER['HTTP_X_REQUEST_ID']);
+          $this->clientReqId = $_SERVER['HTTP_X_REQUEST_ID'];
           break;
       }
       if (substr_compare($k, 'HTTP', 0, 4, TRUE) === 0) {
+        $k = strtolower(str_replace('_', '-', substr($k, 0, 5)));
+        hash_update($this->hashCtx, $k . ': ' .$v);
         $this->http_headers[$k] = $v;
       }
     }
 
-    $this->reqid = hash_final($this->hashCtx);
+    $this->reqid = hash_final($this->hashCtx, FALSE);
   }
 
   function getId() {
+    return bin2hex($this->reqid);
+  }
+
+  function getRawId() {
     return $this->reqid;
   }
 
