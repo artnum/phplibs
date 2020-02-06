@@ -34,6 +34,7 @@ class JsonRequest extends Path
   public $client;
   public $multiple;
   public $items;
+  public $http_headers = array();
   public $clientReqId = null;
   private $hashCtx;
 
@@ -77,14 +78,19 @@ class JsonRequest extends Path
       }
     }
 
-    if (isset($_SERVER['HTTP_X_ARTNUM_REQID'])) {
-      hash_update($this->hashCtx, $_SERVER['HTTP_X_ARTNUM_REQID']);
-      $this->clientReqId = $_SERVER['HTTP_X_ARTNUM_REQID'];
-    }
-
-    if (isset($_SERVER['HTTP_X_REQUEST_ID'])) {
-      hash_update($this->hashCtx, $_SERVER['HTTP_X_REQUEST_ID']);
-      $this->clientReqId = $_SERVER['HTTP_X_REQUEST_ID'];
+    foreach ($_SERVER as $k => $v) {
+      switch ($k) {
+        case 'HTTP_X_ARTNUM_REQID':
+          /* use X-Request-Id if available, X-Artnum-ReqID is obsolete */
+          if (!empty($_SERVER['HTTP_X_REQUEST_ID'])) { break; } 
+        case 'HTTP_X_REQUEST_ID':
+          hash_update($this->hashCtx, $_SERVER['HTTP_X_ARTNUM_REQID']);
+          $this->clientReqId = $_SERVER['HTTP_X_ARTNUM_REQID'];
+          break;
+      }
+      if (substr_compare($k, 'HTTP', 0, 4, TRUE) === 0) {
+        $this->http_headers[$k] = $v;
+      }
     }
 
     $this->reqid = hash_final($this->hashCtx);
