@@ -38,22 +38,30 @@ class Generic {
   protected $signature;
   protected $lockManager;
   protected $data;
-
+  protected $postprocessFunctions = array();
+  
   function __construct($http_request = NULL, $dont_run = false, $options = array()) {
     $this->dbs = array();
     $this->auths = array();
-    $this->crypto = new \artnum\Crypto(null, null, true); // for sjcl javascript library
     $this->signature = null;
     $this->_tstart = microtime(true);
     $this->lockManager = null;
     $this->data = array();
-
+    
     if(isset($options['session'])) {
       $this->session = $options['session'];
     } else {
       $this->session = new Session();
     }
 
+    if (!empty($options['postprocess']) && is_array($options['postprocess'])) {
+      foreach ($options['postprocess'] as $fn) {
+        if (is_callable($fn)) {
+          $this->postprocessFunctions[] = $fn;
+        }
+      }
+    }
+    
     if(is_null($http_request)) {
       try {
         $this->request = new \artnum\HTTP\JsonRequest();
@@ -89,7 +97,7 @@ class Generic {
     if($duplicate) {
       return false;
     } else {
-      array_push($this->auths, $auth_source);
+      $this->auths[] = $auth_source;
     }
     return true;
   }
@@ -192,10 +200,21 @@ class Generic {
     }
   }
 
+  /* postprocess is here to allow to take supplementary action after the request
+   * has been processed and output is done.
+   * Return value is not taken into account
+   */
   function postprocess() {
-    
+    try {
+      foreach ($this->postprocessFunctions as $fn) {
+        $fn($this->request);
+      }
+    } catch(Exception $e) {
+      error_log('Postprocess error : ' . $e->getMessage());
+    }
   }
-  
+
+        
   private function _t() {
     header('X-Artnum-execution-us: ' . intval((microtime(true) - $this->_tstart) * 1000000));
   }
@@ -264,20 +283,16 @@ class Generic {
       $this->fail('Forbidden', 403);
     }
 
-    /* prepare model and controller */
+    /* prepare model */
     $model = '\\' . $this->request->getCollection() . 'Model';
     if(!class_exists($model)) {
       $this->fail('Store doesn\'t exist');
-    }
-    $controller = '\\' . $this->request->getCollection() . 'Controller';
-    if(! class_exists($controller)) {
-      $controller = '\\artnum\HTTPController';
     }
     
     try {
       $model = new $model(NULL, NULL);
       $model->set_db($this->_db($model));
-      $controller = new $controller($model, NULL);
+      $controller = new \artnum\JStore\HTTP($model, NULL);
       $this->session->close();
       
       $results = array('success' => false, 'type' => 'results', 'data' => null, 'length' => 0);
@@ -305,7 +320,6 @@ class Generic {
               'length' => $results['data'][1]
             ));
           }
-          $hash = $this->crypto->hash($body);
 
           $reqId = $this->request->getClientReqId();
           if ($reqId) {
@@ -313,14 +327,7 @@ class Generic {
           } else {
             $reqId = '';
           }
-
-          header('X-Artnum-hash: ' . $hash[0]);
-          header('X-Artnum-hash-algo: ' . $hash[1]);
-          if (!is_null($this->signature)) {
-            $sign = $this->crypto->hmac(implode(':', $hash), $this->signature);
-            header('X-Artnum-sign: ' . $sign[0]);
-            header('X-Artnum-sign-algo: ' . $sign[1]);
-          }
+          
           $this->_t();
           file_put_contents('php://output', $body);
           $this->postprocess();
@@ -359,14 +366,6 @@ class Generic {
       'message' => $message,
       'data' => array(),
       'length' => 0));
-    $hash = $this->crypto->hash($body);
-    header('X-Artnum-hash: ' . $hash[0]);
-    header('X-Artnum-hash-algo: ' . $hash[1]);
-    if (!is_null($this->signature)) {
-      $sign = $this->crypto->hmac(implode(':', $hash), $this->signature);
-      header('X-Artnum-sign: ' . $sign[0]);
-      header('X-Artnum-sign-algo: ' . $sign[1]);
-    }
     $this->_t();
     file_put_contents('php://output', $body);
     exit(-1); 
