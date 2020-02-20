@@ -558,23 +558,24 @@ class SQL extends \artnum\JStore\OP {
   function _read($id) {
     $result = new \artnum\JStore\Result();
     $results = $this->listing(array('search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)));
+
     if (is_array($results)) {
       if ($results[1] !== 1) {
-        $result->addError('Not one result as expected', $id);
+        $result->addError('Not one result as expected');
       } else {
         $result->setItems($results[0][0]);
         $result->setCount(1);
       }
     } else {
       $result->copyError($results);
-
-      if($result->getCount() !== 1) {
-        $result->addError('Not one result as expected', $result->getItems());
+      if($results->getCount() !== 1) {
+        $result->addError('Not one result as expected');
       } else {
         $result->setItems($results->getItems()[0]);
         $result->setCount(1);
       }
     }
+
     return $result;
   }
 
