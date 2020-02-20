@@ -27,7 +27,7 @@
 Namespace artnum\HTTP;
 
 class Response {
-   static $http_code = array(
+  static $http_code = array(
          100 => 'Continue',
          101 => 'Switching Protocols',
          102 => 'Processing',
@@ -94,7 +94,7 @@ class Response {
          511 => 'Network Authentication Required'
             ); 
 
-   function code($code) {
+   static function code($code) {
       $protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
 
       if( ! isset(self::$http_code[intval($code)])) {
