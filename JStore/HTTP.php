@@ -155,7 +155,7 @@ class HTTP extends \artnum\HTTP\CORS
     $retVal = array(
       'success' => false,
       'msg' => 'Generic error',
-      'result' => new JStore\Result());
+      'result' => new Result());
     if ($req->onItem() && $req->getItem() === '.search') {
       $ret = $this->Model->search($req->getParameters());
       if ($ret) {
