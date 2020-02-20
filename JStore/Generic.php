@@ -334,7 +334,14 @@ class Generic {
           if (isset($results['result'])) {
             if ($results['result']->countError() > 0) {
               foreach ($results['result']->getError() as $error) {
-                error_log(sprintf('%d ReqID[%s]@%s:%s +%s+', $error['time'], $reqId, $error['file'], $error['line'], addslashes($error['message'])), 0); 
+                error_log(sprintf('%d ReqID[%s]/%s/%s@%s:%s +%s+',
+                                  $error['time'],
+                                  $reqId,
+                                  $this->request->url_elements[0],
+                                  $this->request->url_elements[1],
+                                  $error['file'],
+                                  $error['line'],
+                                  addslashes($error['message'])), 0);
               }
             }
           }
