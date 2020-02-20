@@ -38,15 +38,15 @@ class Generic {
   protected $signature;
   protected $lockManager;
   protected $data;
-  protected $postprocessFunctions = array();
+  protected $postprocessFunctions = [];
   
-  function __construct($http_request = NULL, $dont_run = false, $options = array()) {
-    $this->dbs = array();
-    $this->auths = array();
+  function __construct($http_request = NULL, $dont_run = false, $options = []) {
+    $this->dbs = [];
+    $this->auths = [];
     $this->signature = null;
     $this->_tstart = microtime(true);
     $this->lockManager = null;
-    $this->data = array();
+    $this->data = [];
     
     if(isset($options['session'])) {
       $this->session = $options['session'];
@@ -79,7 +79,7 @@ class Generic {
 
   function add_db($type, $db) {
     if(!isset($this->dbs[$type])) {
-      $this->dbs[$type] = array();
+      $this->dbs[$type] = [];
     }
 
     $this->dbs[$type][] = $db;
@@ -124,7 +124,7 @@ class Generic {
         }
       }
     } else {
-      $dbs = array();
+      $dbs = [];
       foreach($type as $t) {
         if(isset($this->dbs[$t])) {
           if(count($this->dbs[$t]) == 1) {
@@ -327,7 +327,7 @@ class Generic {
           } else {
             $reqId = '';
           }
-          
+
           $this->_t();
           file_put_contents('php://output', $body);
           $this->postprocess();
@@ -360,12 +360,12 @@ class Generic {
       $message = $message->getMessage();
     }
     \artnum\HTTP\Response::code($code); 
-    $body = json_encode(array(
+    $body = json_encode([
       'success' => false,
       'type' => 'error',
       'message' => $message,
-      'data' => array(),
-      'length' => 0));
+      'data' => [],
+      'length' => 0]);
     $this->_t();
     file_put_contents('php://output', $body);
     exit(-1); 

@@ -70,14 +70,18 @@ class Result {
     }
   }
   
-  function addError ($msg, $data = NULL, $time = null, $file = __FILE__, $line = __LINE__) {
+  function addError ($msg, $data = NULL, $time = null) {
+    $btrace = debug_backtrace();
+    count($btrace) > 1 ? $prev = debug_backtrace()[1] : null;
     if (is_null($time)) { $time = time(); }
     $this->errors[] = array(
       'time' => $time,
       'message' => $msg,
       'data' => $data,
-      'file' => $file,
-      'line' => $line
+      'file' => $prev ? $prev['file'] : null,
+      'line' => $prev ? $prev['line'] : null,
+      'func' => $prev ? $prev['function'] : null,
+      'backtrace' => $btrace
     );
   }
 
