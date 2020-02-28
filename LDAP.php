@@ -168,7 +168,11 @@ class LDAP extends \artnum\JStore\OP {
         }
         $f = $x;
         if(!isset($searches['_' . $name])) {
-          $filter[$name] = '&' . $f;
+          if (isset($searches['_or']) && $searches['_or']) {
+            $filter[$name] = '|' . $f;
+          } else {
+            $filter[$name] = '&' . $f;
+          }
         } else {
           switch(strtolower($searches['_' . $name])) {
             default:
@@ -211,6 +215,7 @@ class LDAP extends \artnum\JStore\OP {
         $filter = '(objectclass=*)';
       }
     }
+    echo $filter;
     return $filter;
   }
 
