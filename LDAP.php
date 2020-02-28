@@ -215,7 +215,6 @@ class LDAP extends \artnum\JStore\OP {
         $filter = '(objectclass=*)';
       }
     }
-    echo $filter;
     return $filter;
   }
 
