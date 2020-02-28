@@ -182,11 +182,14 @@ class JsonRequest extends Path
     if($pairs == FALSE) return array();
     if(empty($pairs)) return array();
     
-    foreach ($pairs as $i) { 
-      list($name,$value) = explode('=', $i, 2);
-      
+    foreach ($pairs as $i) {
+      /* to support flag we look for '=' if there's none it's a flag
+       * and flag can be negated with ! at pos 0
+       */
+      list($name,$value) = strpos($i, '=') === FALSE ? [$i, !(strpos($i, '!') === 0)] : explode('=', $i, 2);
+
       $name = urldecode($name);
-      $value = urldecode($value);
+      if (is_string($value)) { $value = urldecode($value); }
 
       if (strcmp($name, '_qid') === 0) {
         $this->clientReqId = $value;
