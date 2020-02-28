@@ -188,6 +188,9 @@ class JsonRequest extends Path
        */
       list($name,$value) = strpos($i, '=') === FALSE ? [$i, !(strpos($i, '!') === 0)] : explode('=', $i, 2);
 
+      if (strlen($name) > 1 && strpos($name, '!') === 0) {
+        $name = substr($name, 1);
+      }
       $name = urldecode($name);
       if (is_string($value)) { $value = urldecode($value); }
 
