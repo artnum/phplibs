@@ -146,16 +146,17 @@ class SQL extends \artnum\JStore\OP {
   }
 
   function _delete($id) {
+    $result = new \artnum\JStore\Result();
     if (!$this->conf('delete')) {
       try {
         $st = $this->get_db(false)->prepare($this->req('delete'));
         $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
         $st->bindParam(':id', $id, $bind_type);
+        $result->addItem([$id => $st->execute()]);
       } catch (\Exception $e) {
         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-        return false;
+        $result->addItem([$id => false]);
       }
-      return $st->execute();
     } else {
       $data = array($this->IDName => $id);
       if (!$this->conf('delete.ts')) {
@@ -171,12 +172,13 @@ class SQL extends \artnum\JStore\OP {
         }
       }
       try {
-        return $this->update($data) ? TRUE : FALSE;
+        $result->addItem([$id => $this->update($data) == true]);
       } catch (\Exception $e) {
         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-        return FALSE;
+        $result->addItem([$id => false]);
       }
     }
+    return $result;
   }
   
   function _remove_same_value ($array) {
