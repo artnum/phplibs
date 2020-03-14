@@ -338,7 +338,7 @@ class Generic {
                                   $error['time'],
                                   $reqId,
                                   $this->request->url_elements[0],
-                                  $this->request->url_elements[1],
+                                  isset($this->request->url_elements[1]) ? $this->request->url_elements[1] : '',
                                   $error['file'],
                                   $error['line'],
                                   addslashes($error['message'])), 0);
