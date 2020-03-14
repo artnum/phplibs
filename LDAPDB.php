@@ -28,9 +28,9 @@ Namespace artnum;
 
 class LDAPDB {
 
-   protected $Selected;
-   protected $Res;
-
+  protected $Selected;
+  protected $Res;
+  protected $base;
   
   function close() {
     foreach (array( 'ro', 'rw') as $type) {
@@ -44,54 +44,97 @@ class LDAPDB {
   function __destruct() {
     $this->close();
   }
-  
-   function __construct($servers) {
-      if(! is_array($servers)) {
-        $servers = array($servers);
+
+  function getRootDSE($conn) {
+    if (($rRoot = ldap_read($conn, '', '(objectclass=*)', array('+'))) !== FALSE) {
+      return ldap_get_entries($conn, $rRoot);
+    }
+  }
+     
+  function __construct($servers, $base = NULL) {
+    $this->base = $base;
+    
+    if(! is_array($servers)) {
+      $servers = array($servers);
+    }
+   
+    $this->Res = array('ro' => array(), 'rw' => array());
+
+    foreach($servers as $s) {
+      $res = ldap_connect($s['uri']);
+      $dse = $this->getRootDSE($res);
+      if ($dse['count'] < 1) { continue; }
+
+      /* set version */
+      $ldapVersion = 3;
+      if (!empty($dse[0]['supportedldapversion']) &&
+          $dse[0]['supportedldapversion']['count'] > 0) {
+        $ldapVersion = $dse[0]['supportedldapversion'][0];
       }
+      ldap_set_option($res, \LDAP_OPT_PROTOCOL_VERSION, 3);
 
-      $this->Res = array('ro' => array(), 'rw' => array());
-
-      foreach($servers as $s) {
-         $res = ldap_connect($s['uri']);
-         ldap_set_option($res, \LDAP_OPT_PROTOCOL_VERSION, 3);
-         if($res) {
-            if(ldap_bind($res, $s['dn'], $s['password'])) {
-               if(isset($s['ro']) && $s['ro']) {
-                  $this->Res['ro'][] = array('_' => $res, 'server' => $s);
-               } else {
-                  $this->Res['rw'][] = array('_' => $res, 'server' => $s);
-               }
-            }        
-         }
-      }
-   }
-
-   function _con($t = 'ro') {
-      if(isset($this->Selected[$t])) { return $this->Selected[$t]['_']; }
-
-      $type = $t;
-      if(!isset($this->Res[$type])) {
-         $type = 'rw'; /* there should be, at least, one rw connection */ 
-         if(!isset($this->Res[$type])) { return NULL; }
-      }
-
-      if(count($this->Res[$type]) == 1) {
-         $this->Selected[$t] = $this->Res[$type][0];
+      /* verify if apply to base or set base */
+      if (empty($dse[0]['namingcontexts'])) { error_log('Empty namingcontexts'); continue; }
+      if ($dse[0]['namingcontexts']['count'] < 1) { error_log('Empty namingcontexts'); continue; }
+      if ($this->base !== null) {
+        $valid = false;
+        for($i = 0; $i < $dse[0]['namingcontexts']['count']; $i++) {
+          if (strstr($this->base, $dse[0]['namingcontexts'][$i])) {
+            $valid = true;
+            break;
+          }
+        }
+        if (!$valid) { error_log('No valid namingcontexts');  continue; }
       } else {
-         $this->Selected[$t] = $this->Res[$type][rand(0, count($this->Res[$type]) - 1)];
+        /* base is set to the first naming context of the first server */
+        $this->base = $dse[0]['namingcontexts'][0];
       }
+     
+      if($res) {
+        if(ldap_bind($res, $s['dn'], $s['password'])) {
+          if(isset($s['ro']) && $s['ro']) {
+            $this->Res['ro'][] = array('_' => $res, 'server' => $s);
+          } else {
+            $this->Res['rw'][] = array('_' => $res, 'server' => $s);
+          }
+        }        
+      }
+    }
 
-      return $this->Selected[$t]['_'];
-   }
+    if (empty($this->Res['ro']) && empty($this->Res['rw'])) {
+      throw new \Error('No valid server');
+    }
+  }
 
-   function readable() {
-      return $this->_con('ro');
-   }
+  function _con($t = 'ro') {
+    if(isset($this->Selected[$t])) { return $this->Selected[$t]['_']; }
 
-   function writable() {
-      return $this->_con('rw');
-   }
+    $type = $t;
+    if(!isset($this->Res[$type])) {
+      $type = 'rw'; /* there should be, at least, one rw connection */ 
+      if(!isset($this->Res[$type])) { return NULL; }
+    }
+
+    if(count($this->Res[$type]) == 1) {
+      $this->Selected[$t] = $this->Res[$type][0];
+    } else {
+      $this->Selected[$t] = $this->Res[$type][rand(0, count($this->Res[$type]) - 1)];
+    }
+
+    return $this->Selected[$t]['_'];
+  }
+
+  function getBase() {
+    return $this->base;
+  }
+  
+  function readable() {
+    return $this->_con('ro');
+  }
+
+  function writable() {
+    return $this->_con('rw');
+  }
 }
 
 ?>

@@ -28,16 +28,16 @@ Namespace artnum;
 
 class LDAP extends \artnum\JStore\OP {
   protected $DB;
-  protected $Suffix;
+  protected $base;
   protected $Config;
   protected $Attribute;
 
-  function __construct($db, $suffix, $attributes, $config) {
+  function __construct($db, $base = NULL, $attributes = NULL, $config = NULL) {
     $this->DB = $db;
-    $this->Suffix = $suffix;
+    $this->base = $base;
     $this->Config = $config;
     $this->Binary = array();
-
+    
     if(is_array($this->Config['binary'])) {
       foreach($this->Config['binary'] as $b) {
         $this->Binary[] = strtolower($b);
@@ -62,11 +62,22 @@ class LDAP extends \artnum\JStore\OP {
     $this->DB = $db;
   }
 
+  function getBase () {
+    if ($this->base) {
+      return $this->base;
+    } else {
+      if ($this->DB) {
+        return $this->DB->getBase();
+      }
+    }
+    return NULL;
+  }
+  
   function _dn($dn = NULL) {
     $ret = NULL;
-    if(!is_null($this->Suffix)) {
+    if(!is_null($this->getBase())) {
       if(empty($dn) || is_null($dn)) {
-        $ret = $this->Suffix;
+        $ret = $this->getBase();
       } else {
         if (strpos('=', $dn) === FALSE && $this->conf('rdnAttr')) {
           $dn = $this->conf('rdnAttr') . '=' . ldap_escape($dn, LDAP_ESCAPE_DN);
@@ -74,7 +85,7 @@ class LDAP extends \artnum\JStore\OP {
           list ($attr, $value) = explode('=', $dn, 2);
           $dn = ldap_escape($attr, LDAP_ESCAPE_DN) . '=' . ldap_escape($value, LDAP_ESCAPE_DN);
         }
-        $ret = $dn . ',' . $this->Suffix;
+        $ret = $dn . ',' . $this->getBase();
       }
     }
 
@@ -282,7 +293,7 @@ class LDAP extends \artnum\JStore\OP {
   }
 
   function buildDn ($rdnValue, $sub = null) {
-    $base = $this->Suffix;
+    $base = $this->getBase();
     $rdnAttr = $this->conf('rdnAttr');
 
     if ($sub != null) {
