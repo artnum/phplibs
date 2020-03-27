@@ -79,11 +79,11 @@ class LDAP extends \artnum\JStore\OP {
       if(empty($dn) || is_null($dn)) {
         $ret = $this->getBase();
       } else {
-        if (strpos('=', $dn) === FALSE && $this->conf('rdnAttr')) {
+        if (strpos($dn, '=') === FALSE && $this->conf('rdnAttr')) {
           $dn = $this->conf('rdnAttr') . '=' . ldap_escape($dn, LDAP_ESCAPE_DN);
         } else {
           list ($attr, $value) = explode('=', $dn, 2);
-          $dn = ldap_escape($attr, LDAP_ESCAPE_DN) . '=' . ldap_escape($value, LDAP_ESCAPE_DN);
+          $dn = $attr . '=' . ldap_escape($value, LDAP_ESCAPE_DN);
         }
         $ret = $dn . ',' . $this->getBase();
       }
