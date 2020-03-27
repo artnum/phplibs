@@ -64,7 +64,9 @@ class Menshen {
             case 'cid':
             case 'sig':
             case 'sle':
-              $args[$k] = hex2bin($v);
+              $args[$k] = hex2bin(
+                str_replace([' ', '\t', '\n', '\r'], '', $v)
+              );
               break;
             case 'mgf':
             case 'dgt':
