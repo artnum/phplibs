@@ -98,7 +98,13 @@ class HTTP extends \artnum\HTTP\CORS
             }
           }
         }
-        if($run < 15 && $req->getParameter('long') && $results[1] == 0) {
+        $c = 0;
+        if (is_array($results)) {
+          $c = $result[1];
+        } else {
+          $c = $results->getCount();
+        }
+        if($run < 15 && $req->getParameter('long') && $c == 0) {
           $continue = true;
           sleep(1);
           $run++;
