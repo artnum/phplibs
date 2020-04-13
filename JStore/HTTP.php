@@ -100,7 +100,7 @@ class HTTP extends \artnum\HTTP\CORS
         }
         $c = 0;
         if (is_array($results)) {
-          $c = $result[1];
+          $c = $results[1];
         } else {
           $c = $results->getCount();
         }
