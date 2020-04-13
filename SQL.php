@@ -305,8 +305,9 @@ class SQL extends \artnum\JStore\OP {
         return sprintf('%s(__FIELDNAME__, %d) %s __VALUE__', strtoupper($function), intval($arguments[0]), $operator);
     }
   }
-  
+
   function prepareSearch($searches) {
+    $whereClause = '';
     $op = ''; $no_value = false; $s = array();
     foreach($searches as $name => $search) {
       if($name == '_rules') { continue; }
@@ -389,22 +390,23 @@ class SQL extends \artnum\JStore\OP {
 
     if(count($s)>0) {
       if(! isset($searches['_rules'])) {
-        return 'WHERE ' . implode(' AND ', $s);
+        $whereClause = 'WHERE ' . implode(' AND ', $s);
       } else {
         $rule = explode(' ', $searches['_rules']);
         foreach ($rule as &$r) {
-          if (preg_match('/([a-zA-Z0-9_]+)/', $r, $matches)) {
+          if (preg_match('/([a-zA-Z0-9_:]+)/', $r, $matches)) {
             if (!empty($s[$matches[0]])) {
               $r = str_replace($matches[0], $s[$matches[0]], $r);
             }
           }
         }
-        return 'WHERE ' . implode(' ', $rule);
+        $whereClause = 'WHERE ' . implode(' ', $rule);
       }
-    } else {
-      return '';
     }
+
+    return $whereClause;
   }
+
   function prepareLimit($limit) {
     if(ctype_digit($limit)) {
       return ' LIMIT ' . $limit;
