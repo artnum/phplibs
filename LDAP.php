@@ -80,15 +80,14 @@ class LDAP extends \artnum\JStore\OP {
         $ret = $this->getBase();
       } else {
         if (strpos($dn, '=') === FALSE && $this->conf('rdnAttr')) {
-          $dn = $this->conf('rdnAttr') . '=' . ldap_escape($dn, LDAP_ESCAPE_DN);
+          $dn = $this->conf('rdnAttr') . '=' . $dn;
         } else {
           list ($attr, $value) = explode('=', $dn, 2);
-          $dn = $attr . '=' . ldap_escape($value, LDAP_ESCAPE_DN);
+          $dn = $attr . '=' . $value;
         }
         $ret = $dn . ',' . $this->getBase();
       }
     }
-
     if ($ret != NULL) {
       return $ret;
     }
@@ -306,7 +305,7 @@ class LDAP extends \artnum\JStore\OP {
     }
     
     if ($base && $rdnAttr && $rdnValue) {
-      return sprintf('%s=%s,%s', ldap_escape($rdnAttr, LDAP_ESCAPE_DN), ldap_escape($rdnValue, LDAP_ESCAPE_DN), $base);
+      return sprintf('%s=%s,%s', $rdnAttr, $rdnValue, $base);
     }
     return null;
   }
