@@ -83,7 +83,6 @@ class JRestClient {
             $urls[] = \rawurlencode($e);
          }
       }
-
       return \join('/', $urls) . '/';
    }
 
@@ -92,9 +91,14 @@ class JRestClient {
    }
 
    protected function exec() {
-      return $this->_return(\curl_exec($this->ch)); 
+      $ret = curl_exec($this->ch);
+      $this->error = curl_error($this->ch);
+      return $this->_return($ret);
    }
 
+   function error () {
+      return $this->error;
+   }
    /* Add an element */
    function put($data, $id, $collection = NULL) {
       $jdata = \json_encode($data);
