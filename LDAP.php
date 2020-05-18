@@ -107,7 +107,7 @@ class LDAP extends \artnum\JStore\OP {
           $result->addItem($entry);
         }
       }
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
       $result->addError($e->getMessage(), $e);
     }
     return $result;
@@ -150,29 +150,35 @@ class LDAP extends \artnum\JStore\OP {
         switch($search[0]) {
           default:
             $value = $search;
-          case '=': $op = $name . '=' . trim($value); break;
-          case '~': $op = $name . '~=' . trim($value); break;
-          case '!': $op = '!(' . $name . '=' . trim($value) . ')'; break;
+          case '=': $op = $name . '=__VALUE__'; break;
+          case '~': $op = $name . '~=__VALUE__'; break;
+          case '!': $op = '!(' . $name . '=__VALUE__)'; break;
           case '-': $op = '!(' . $name . '=*)'; break;
           case '*':
-            $op = $name . '=*'; break;
+            if (strlen(trim($value)) > 0) {
+              $op  = $name . '=*__VALUE__';
+            } else {
+              $op = $name . '=*';
+            }
+          break;
           case '<':
             if($search[1] == '=') {
-              $value = trim(substr($value, 1));
-              $op = $name . '<=' . $value;
+              $value = substr($value, 1);
+              $op = $name . '<=__VALUE__';
             } else {
-              $op = $name . '<' . trim($value);
+              $op = $name . '<__VALUE__';
             }
             break;
           case '>':
             if($search[1] == '=') {
-              $value = trim(substr($value, 1));
-              $op = $name . '>=' . $value;
+              $value = substr($value, 1);
+              $op = $name . '>=__VALUE__';
             } else {
-              $op = $name . '>' . trim($value);
+              $op = $name . '>__VALUE__';
             }
             break;
         }
+        $op = str_replace('__VALUE__', str_replace('\\%', '%', preg_replace('/(?<!\\\\)%/', '*', trim($value))), $op);
         $f[] = $op; $s++;
       }
       if (count($f) == 1) {
@@ -268,7 +274,7 @@ class LDAP extends \artnum\JStore\OP {
 
         $entry[$attr] = $value;
       }
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
       $result->addError($e->getMessage(), $e);
     }
     return $entry;
@@ -277,12 +283,16 @@ class LDAP extends \artnum\JStore\OP {
   function listing($options) {
     $result = new \artnum\JStore\Result();
     $c = $this->DB->readable();
-    if(isset($options['search'])) {
+    if(!empty($options['search'])) {
       $filter = $this->prepareSearch($options['search']);
     } else {
       $filter = '(objectclass=*)';
     }
-    $res = ldap_list($c, $this->_dn(), $filter, $this->Attribute);
+    $limit = 0;
+    if (!empty($options['limit']) && ctype_digit(($options['limit']))) {
+      $limit = intval($options['limit']);
+    }
+    $res = @ldap_list($c, $this->_dn(), $filter, $this->Attribute, 0, $limit);
     if($res) {
       for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
         $result->addItem($this->processEntry($c, $e, $result));
