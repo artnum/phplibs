@@ -19,7 +19,7 @@ class Menshen {
 
       $auth = $this->getAuth();
       if (empty($auth)) { return false; }
-      
+
       $pkey = $this->certStore->getPublicKey($auth['cid'], $this->storePriv);
       if (empty($pkey)) { return false; }
       $rsa = new \phpseclib\Crypt\RSA();
@@ -52,21 +52,22 @@ class Menshen {
       'sle' => 0, /* saltlen */
       'mgf' => 'sha256'
     ];
-    
-    if (!empty($_SERVER['HTTP_AUTHORISATION'])) {
-      $auth = strtolower(trim($_SERVER['HTTP_AUTHORISATION']));
+
+    if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+      $auth = strtolower(trim($_SERVER['HTTP_AUTHORIZATION']));
       if (substr($auth, 0, 8) === 'menshen ') {
-        $authstr = explode(',', substr($auth, 8));
-        foreach ($authstr as $p) {
-          $k = substr($p, 0, 3);
-          $v = substr($p, 4);
+      $authstr = explode(',', substr($auth, 8));
+      foreach ($authstr as $p) {
+          $_p = explode('=', $p);
+          $k = trim($_p[0]);
+	  $v = trim($_p[1]);
           switch($k) {
             case 'cid':
-            case 'sig':
-            case 'sle':
-              $args[$k] = hex2bin(
-                str_replace([' ', '\t', '\n', '\r'], '', $v)
-              );
+	    case 'sle':
+ 	     $args[$k] = $v;
+	     break;
+	    case 'sig':
+              $args[$k] = hex2bin($v);
               break;
             case 'mgf':
             case 'dgt':
@@ -81,8 +82,9 @@ class Menshen {
                   break;
               }
           }
-        }
-        if ($args['cid'] === false || $args['sig'] === false) { return []; }
+      }
+
+	if ($args['cid'] === false || $args['sig'] === false) { return []; }
 
         return $args;
       }
