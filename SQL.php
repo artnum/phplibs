@@ -337,8 +337,20 @@ class SQL extends \artnum\JStore\OP {
           case '=': $op = '__FIELDNAME__ = __VALUE__'; break;
           case '~': $op = '__FIELDNAME__ LIKE __VALUE__'; break;
           case '!': $op = '__FIELDNAME__ <> __VALUE__'; break;
-          case '-': $op = '__FIELDNAME__ IS NULL'; break;
-          case '*': $op = '__FIELDNAME__ IS NOT NULL'; break;
+          case '-': 
+            if (strlen($search) === 1) {
+              $op = '__FIELDNAME__ IS NULL';
+            } else {
+              $op = '(__FIELDNAME__ IS NULL OR __FIELDNAME__ = \'\')';
+            }
+          break;
+          case '*': 
+            if (strlen($search) === 1) {
+              $op = '__FIELDNAME__ IS NOT NULL';
+            } else {
+              $op = '(__FIELDNAME__ IS NOT NULL OR __FIELDNAME__ <> \'\')';
+            }
+            break;
           case '<':
             if($search[1] == '=') {
               $value = substr($value, 1);
