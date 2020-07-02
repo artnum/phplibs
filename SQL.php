@@ -376,11 +376,15 @@ class SQL extends \artnum\JStore\OP {
           $fieldname = substr($name, 0, $pos);
         }
         $tablename = $this->conf('Table');
-        if (strpos($fieldname, '_', true) !== FALSE) {
-          list ($tablename, $fieldname) = explode('_', $fieldname, 2);
-          $fieldname = '"' . $tablename . '"."' . $tablename . '_' . $fieldname .'"';
+        if ($fieldname[0] === '@') {
+          $fieldname = substr($fieldname, 1);
         } else {
-          $fieldname = '"' . $this->conf('Table') . '"."' . $this->conf('Table') . '_' . $fieldname .'"';
+          if (strpos($fieldname, '_', true) !== FALSE) {
+            list ($tablename, $fieldname) = explode('_', $fieldname, 2);
+            $fieldname = '"' . $tablename . '"."' . $tablename . '_' . $fieldname .'"';
+          } else {
+            $fieldname = '"' . $this->conf('Table') . '"."' . $this->conf('Table') . '_' . $fieldname .'"';
+          }
         }
 
         if (!isset($s[$name])) {
