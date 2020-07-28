@@ -46,6 +46,7 @@ class PDF extends \tFPDF {
   protected $blocks = array();
   protected $current_block = null;
   protected $margin = array('left' => null, 'right' => null, 'top' => null);
+  public $coverPage = 0;
 
   function __construct() {
     parent::__construct();
@@ -358,11 +359,28 @@ class PDF extends \tFPDF {
     }
   }
 
+  function addCover() {
+    $this->coverPage++;
+  }
+
+  function pageCount() {
+    return count($this->pages);
+  }
+
   function resetFontSize() {
     $this->setFontSize($this->last_font_size);
   }
 
-  function setFontSize($mm) {
+  function setPtFontSize($pt) {
+  	$this->FontSizePt = $pt;
+	  $this->FontSize = $pt / $this->k;
+	  if($this->page>0) {
+		  $this->_out(sprintf('BT /F%d %.2F Tf ET',$this->CurrentFont['i'],$this->FontSizePt));
+    }
+  }
+
+  function setFontSize($mm, $pt = false) {
+    if ($pt) { return $this->setPtFontSize($mm); }
     $this->last_font_size = $this->FontSize;
     $this->FontSize = $mm;
     $this->FontSizePt = $mm * $this->k;
