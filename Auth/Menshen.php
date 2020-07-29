@@ -1,50 +1,78 @@
 <?PHP
+
 namespace artnum\Auth;
 
 require('phpseclib/autoload.php');
 
-class Menshen {
+class Menshen
+{
   protected $certStore;
   protected $storePriv;
-  
-  function __construct($store, $storePrivateData = null) {
+
+  function __construct($store, $storePrivateData = null)
+  {
+    $this->Auth = [];
     $this->certStore = $store;
     $this->storePriv = $storePrivateData;
     $this->certStore->init($this->storePriv);
   }
-  
-  function check() {
+
+  function check()
+  {
     try {
-      if (!$this->certStore->beginCheck($this->storePriv)) { return false; }
+      if (!$this->certStore->beginCheck($this->storePriv)) {
+        return false;
+      }
 
       $auth = $this->getAuth();
-      if (empty($auth)) { return false; }
-
+      if (empty($auth)) {
+        return false;
+      }
+      
       $pkey = $this->certStore->getPublicKey($auth['cid'], $this->storePriv);
-      if (empty($pkey)) { return false; }
+      if (empty($pkey)) {
+        return false;
+      }
+
       $rsa = new \phpseclib\Crypt\RSA();
-      if(!$rsa->loadKey($pkey)) { return false; }
+      if (!$rsa->loadKey($pkey)) {
+        return false;
+      }
 
       $mid = $this->getMID();
-      if (empty($mid)) { return false; }
-
+      if (empty($mid)) {
+        return false;
+      }
 
       $rsa->setHash($auth['dgt']);
       $rsa->setMGFHash($auth['mgf']);
       $rsa->setSaltLength($auth['sle']);
       $rsa->setSignatureMode(\phpseclib\Crypt\RSA::SIGNATURE_PSS);
-      
+
       $success = $rsa->verify($mid, $auth['sig']);
-      if (!$this->certStore->endCheck($auth['cid'], $success, $this->storePriv)) { return false; }
+      if (!$this->certStore->endCheck($auth['cid'], $success, $this->storePriv)) {
+        echo 'E';
+        return false;
+      }
+      $this->Auth = $auth;
 
       return $success;
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
+      echo $e->getMessage();
       error_log('Menshen::"' . $e->getMessage() . '"');
       return false;
-    }   
+    }
   }
-  
-  protected function getAuth () {
+
+  public function getCID() {
+    if (!empty($this->Auth) && !empty($this->Auth['cid'])) {
+      return $this->Auth['cid'];
+    }
+    return null;
+  }
+
+  protected function getAuth()
+  {
     $args = [
       'cid' => false, /* client id */
       'sig' => false, /* signature */
@@ -56,17 +84,17 @@ class Menshen {
     if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
       $auth = strtolower(trim($_SERVER['HTTP_AUTHORIZATION']));
       if (substr($auth, 0, 8) === 'menshen ') {
-      $authstr = explode(',', substr($auth, 8));
-      foreach ($authstr as $p) {
+        $authstr = explode(',', substr($auth, 8));
+        foreach ($authstr as $p) {
           $_p = explode('=', $p);
           $k = trim($_p[0]);
-	  $v = trim($_p[1]);
-          switch($k) {
+          $v = trim($_p[1]);
+          switch ($k) {
             case 'cid':
-	    case 'sle':
- 	     $args[$k] = $v;
-	     break;
-	    case 'sig':
+            case 'sle':
+              $args[$k] = $v;
+              break;
+            case 'sig':
               $args[$k] = hex2bin($v);
               break;
             case 'mgf':
@@ -82,24 +110,30 @@ class Menshen {
                   break;
               }
           }
-      }
+        }
 
-	if ($args['cid'] === false || $args['sig'] === false) { return []; }
+        if ($args['cid'] === false || $args['sig'] === false) {
+          return [];
+        }
 
         return $args;
       }
     }
     return [];
   }
-  
-  protected function getMID () {
-    if (!empty($_SERVER['REQUEST_METHOD']) &&
-        !empty($_SERVER['HTTP_X_REQUEST_ID']) &&
-        !empty($_SERVER['REQUEST_URI'])) {
-      return sprintf('%s|%s|%s',
-                     strtolower(trim($_SERVER['REQUEST_METHOD'])),
-                     $_SERVER['REQUEST_URI'],
-                     strtolower(trim($_SERVER['HTTP_X_REQUEST_ID']))
+
+  protected function getMID()
+  {
+    if (
+      !empty($_SERVER['REQUEST_METHOD']) &&
+      !empty($_SERVER['HTTP_X_REQUEST_ID']) &&
+      !empty($_SERVER['REQUEST_URI'])
+    ) {
+      return sprintf(
+        '%s|%s|%s',
+        strtolower(trim($_SERVER['REQUEST_METHOD'])),
+        $_SERVER['REQUEST_URI'],
+        strtolower(trim($_SERVER['HTTP_X_REQUEST_ID']))
       );
     }
     return '';
@@ -109,7 +143,8 @@ class Menshen {
 
 namespace artnum\Auth\Menshen;
 
-interface CertStore {
+interface CertStore
+{
   public function init($privateData);
   public function beginCheck($privateData);
   public function endCheck($clientId, $success, $privateData);
@@ -119,23 +154,35 @@ interface CertStore {
 
 /* == DB ==
 CREATE TABLE IF NOT EXISTS "menshen" ("clientid" INTEGER PRIMARY KEY AUTO_INCREMENT, "pkcs8" TEXT NOT NULL);
-*/  
-class PDOStore implements CertStore {
+*/
+class PDOStore implements CertStore
+{
   protected $db;
   protected $tname;
-  
-  function __construct($pdoConn, $tableName) {
+
+  function __construct($pdoConn, $tableName)
+  {
     $this->db = $pdoConn;
     $this->tname = $tableName;
   }
 
-  function init($privateData) { return true; }
+  function init($privateData)
+  {
+    return true;
+  }
 
-  function beginCheck($privateData) { return true; }
+  function beginCheck($privateData)
+  {
+    return true;
+  }
 
-  function endCheck($clientId, $success, $privateData) { return true; }
+  function endCheck($clientId, $success, $privateData)
+  {
+    return true;
+  }
 
-  function getPublicKey($clientId, $privateData) {
+  function getPublicKey($clientId, $privateData)
+  {
     $st = $this->db->prepare('SELECT * FROM "' . $this->tname . '" WHERE "clientid" = :cid');
     $st->bindParam(':cid', $clientId, \PDO::PARAM_INT);
     if ($st->execute()) {
@@ -145,6 +192,6 @@ class PDOStore implements CertStore {
     }
 
     return false;
-  }  
+  }
 }
 ?>
