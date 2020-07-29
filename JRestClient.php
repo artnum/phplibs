@@ -29,9 +29,12 @@ Namespace artnum;
 class JRestClient {
 
    protected $url;
+   protected $effectiveURL;
+   protected $method;
    protected $collection;
    protected $ch;
    protected $headers;
+   protected $queryHeaders;
    protected $body_raw;
    protected $http_code;
    protected $tls;
@@ -55,7 +58,9 @@ class JRestClient {
       if(\is_null($url)) {
          $url = $this->url;
       }
-      $this->headers = array();
+      $this->headers = [];
+      $this->queryHeaders = [];
+      $this->effectiveURL = $url;
       \curl_setopt($this->ch, \CURLOPT_URL, $url);
       \curl_setopt($this->ch, \CURLOPT_RETURNTRANSFER, true);
       \curl_setopt($this->ch, \CURLOPT_HEADER, 1);
@@ -91,6 +96,14 @@ class JRestClient {
    }
 
    protected function exec() {
+      if (count($this->queryHeaders) > 0) {
+         $headers = [];
+         foreach($this->queryHeaders as $k => $v) {
+            $headers[] = "$k: $v";
+         }
+
+         curl_setopt($this->ch, \CURLOPT_HTTPHEADER, $headers);
+      }
       $ret = curl_exec($this->ch);
       $this->error = curl_error($this->ch);
       return $this->_return($ret);
@@ -101,45 +114,51 @@ class JRestClient {
    }
    /* Add an element */
    function put($data, $id, $collection = NULL) {
+      $this->method = 'PUT';
       $jdata = \json_encode($data);
       $this->_init($this->_build_url(array($id), $collection));
       \curl_setopt($this->ch, \CURLOPT_CUSTOMREQUEST, 'PUT');
       \curl_setopt($this->ch, \CURLOPT_POSTFIELDS, $jdata);
-      \curl_setopt($this->ch, \CURLOPT_HTTPHEADER, array(
+      $this->queryHeaders = [
                'Content-Type: application/json',
                'Content-Length: ' . \strlen($jdata),
-               'Content-MD5: ' . \md5($jdata)));
+               'Content-MD5: ' . \md5($jdata)
+            ];
       return $this->exec();
    }
 
    /* Update an element */
    function post($data, $collection = NULL) {
+      $this->method = 'POST';
       $jdata = \json_encode($data);
       $this->_init($this->_build_url(NULL, $collection));
       \curl_setopt($this->ch, \CURLOPT_POST, TRUE);
       \curl_setopt($this->ch, \CURLOPT_POSTFIELDS, $jdata);
-      \curl_setopt($this->ch, \CURLOPT_HTTPHEADER, array(
+      $this->queryHeaders = [
                'Content-Type: application/json',
                'Content-Length: ' . \strlen($jdata),
-               'Content-MD5: ' . \md5($jdata)));
+               'Content-MD5: ' . \md5($jdata)
+            ];
       return $this->exec();
    }
 
    /* Edit an element */
    function patch($data, $id, $collection = NULL) {
+      $this->method = 'PATCH';
       $jdata = \json_encode($data);
-      print_r($jdata);
       $this->_init($this->_build_url(array($id), $collection));
       \curl_setopt($this->ch, \CURLOPT_CUSTOMREQUEST, 'PATCH');
       \curl_setopt($this->ch, \CURLOPT_POSTFIELDS, $jdata);
-      \curl_setopt($this->ch, \CURLOPT_HTTPHEADER, array(
+      $this->queryHeaders = [
                'Content-Type: application/json',
                'Content-Length: ' . \strlen($jdata),
-               'Content-MD5: ' . \md5($jdata)));
+               'Content-MD5: ' . \md5($jdata)
+            ];
       return $this->exec();
    }
 
    function direct($url) {
+      $this->method = 'GET';
       $this->_init($url);
       \curl_setopt($this->ch, \CURLOPT_HTTPGET, TRUE);
       return $this->exec();
@@ -147,6 +166,7 @@ class JRestClient {
 
    /* Get an element */
    function get($id, $collection = NULL) {
+      $this->method = 'GET';
       $this->_init($this->_build_url(array($id), $collection));
       \curl_setopt($this->ch, \CURLOPT_HTTPGET, TRUE);
       return $this->exec();
@@ -154,6 +174,7 @@ class JRestClient {
 
    /* Delete an element */
    function delete($id, $collection = NULL) {
+      $this->method = 'DELETE';
       $this->_init($this->_build_url(array($id), $collection));
       \curl_setopt($this->ch, \CURLOPT_CUSTOMREQUEST, 'DELETE');
       return $this->exec();
@@ -161,6 +182,7 @@ class JRestClient {
   
    /* Get all entry from a collection */ 
    function getCollection($collection = NULL) {
+      $this->method = 'GET';
       $this->_init($this->_build_url(NULL, $collection));
       \curl_setopt($this->ch, \CURLOPT_HTTPGET, TRUE);
       return $this->exec();
@@ -168,6 +190,7 @@ class JRestClient {
 
    /* Search in a collection, if no search term, return whole collection */
    function search($search = array(), $collection = NULL) {
+      $this->method = 'GET';
       if(empty($search)) {
          return $this->getCollection($collection);
       }
@@ -232,7 +255,6 @@ class JRestClient {
 
       $header_txt = \substr($txt, 0, $header_size);
       $this->body_raw = \substr($txt, $header_size);
-
       \curl_close($this->ch);
       $this->_parse_header($header_txt);
       if(isset($this->header['Content-MD5'])) {
