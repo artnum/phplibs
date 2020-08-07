@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2017 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2017-2020 Etienne Bagnoud <etienne@artnum.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,6 +46,7 @@ class PDF extends \tFPDF {
   protected $blocks = array();
   protected $current_block = null;
   protected $margin = array('left' => null, 'right' => null, 'top' => null);
+  protected $blank = 0;
   public $coverPage = 0;
 
   function __construct() {
@@ -116,11 +117,93 @@ class PDF extends \tFPDF {
   }
 
   function AddPage($orientation = '', $size = '', $rotation = 0) {
+    /* extension */
     $this->_flushblock();
-    $ret = parent::AddPage($orientation, $size, $rotation);
+
+    /* direct copy of original AddPage */
+    // Start a new page 
+    if($this->state==3)
+      $this->Error('The document is closed');
+
+    $family = $this->FontFamily;
+    $style = $this->FontStyle.($this->underline ? 'U' : '');
+    $fontsize = $this->FontSizePt;
+    $lw = $this->LineWidth;
+    $dc = $this->DrawColor;
+    $fc = $this->FillColor;
+    $tc = $this->TextColor;
+    $cf = $this->ColorFlag;
+    if($this->page>0)
+    {
+      // Page footer
+      if ($this->blank <= 1) {
+        $this->InFooter = true;
+        $this->Footer();
+        $this->InFooter = false;
+      } else {
+        $this->blank = 0;
+      }
+      // Close page
+      $this->_endpage();
+    }
+    // Start new page
+    $this->_beginpage($orientation,$size,$rotation);
+    // Set line cap style to square
+    $this->_out('2 J');
+    // Set line width
+    $this->LineWidth = $lw;
+    $this->_out(sprintf('%.2F w',$lw*$this->k));
+    // Set font
+    if($family)
+    $this->SetFont($family,$style,$fontsize);
+    // Set colors
+    $this->DrawColor = $dc;
+    if($dc!='0 G')
+    $this->_out($dc);
+    $this->FillColor = $fc;
+    if($fc!='0 g')
+    $this->_out($fc);
+    $this->TextColor = $tc;
+    $this->ColorFlag = $cf;
+    if ($this->blank < 1) {
+      // Page header
+      $this->InHeader = true;
+      $this->Header();
+      $this->InHeader = false;
+    } else {
+      $this->blank = 2;
+    }
+    // Restore line width
+    if($this->LineWidth!=$lw)
+    {
+      $this->LineWidth = $lw;
+      $this->_out(sprintf('%.2F w',$lw*$this->k));
+    }
+    // Restore font
+    if($family)
+      $this->SetFont($family,$style,$fontsize);
+    // Restore colors
+    if($this->DrawColor!=$dc)
+    {
+      $this->DrawColor = $dc;
+      $this->_out($dc);
+    }
+    if($this->FillColor!=$fc)
+    {
+      $this->FillColor = $fc;
+      $this->_out($fc);
+    }
+    $this->TextColor = $tc;
+    $this->ColorFlag = $cf;
+    
+    /* extension */
     $this->SetXY($this->lMargin, $this->tMargin);
     $this->_reinitblock();
-    return $ret;
+  }
+
+  function AddBlankPage ($orientation = '', $size = '') {
+    $this->blank = 1;
+    $this->AddPage($orientation, $size);
   }
 
   function SetFillColor($color, $g = NULL, $b = NULL) {
@@ -373,7 +456,8 @@ class PDF extends \tFPDF {
 
   function setPtFontSize($pt) {
   	$this->FontSizePt = $pt;
-	  $this->FontSize = $pt / $this->k;
+    $this->FontSize = $pt / $this->k;
+    $this->last_font_size = $this->FontSize;
 	  if($this->page>0) {
 		  $this->_out(sprintf('BT /F%d %.2F Tf ET',$this->CurrentFont['i'],$this->FontSizePt));
     }
@@ -886,6 +970,17 @@ class PDF extends \tFPDF {
       $this->resetFontSize();
     }
     $this->_block();
+  }
+
+  function getMargin ($margin = '') {
+    switch (strtoupper($margin)) {
+      // css order (top - right - bottom - left)
+      default: return [$this->tMargin, $this->rMargin, $this->bMargin, $this->lMargin]; 
+      case 'T': return $this->tMargin;
+      case 'R': return $this->rMargin;
+      case 'B': return $this->bMargin;
+      case 'L': return $this->lMargin;
+    }
   }
 }
 ?>
