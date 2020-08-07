@@ -982,5 +982,15 @@ class PDF extends \tFPDF {
       case 'L': return $this->lMargin;
     }
   }
+
+  function getDimension ($dimension = '') {
+    switch (strtoupper($dimension)) {
+      default: return [$this->w, $this->h, $this->wPt, $this->hPt];
+      case 'W': return $this->w;
+      case 'WPT': return $this->wPt;
+      case 'H': return $this->h;
+      case 'HPT': return $this->hPt;
+    }
+  }
 }
 ?>
