@@ -992,5 +992,24 @@ class PDF extends \tFPDF {
       case 'HPT': return $this->hPt;
     }
   }
+
+   /* fix httpencode for some case where user agent is not set */
+   protected function _httpencode($param, $value, $isUTF8)
+   {
+      // Encode HTTP header field parameter
+      if($this->_isascii($value)) {
+         return $param.'="'.$value.'"';
+      }
+      if(!$isUTF8) {
+         $value = utf8_encode($value);
+      }
+      if(!empty($_SERVER['HTTP_USER_AGENT']) && strpos($_SERVER['HTTP_USER_AGENT'],'MSIE')!==false) {
+         return $param.'="'.rawurlencode($value).'"';
+      } else {
+         return $param."*=UTF-8''".rawurlencode($value);
+      }
+   }
 }
+
+
 ?>
