@@ -116,6 +116,27 @@ class PDF extends \tFPDF {
     return $ret;
   }
 
+  function Close()
+  {
+    if($this->state==3) {
+      return;
+    }
+    
+    if($this->page==0) {
+      $this->AddPage();
+    }
+    if ($this->blank <= 1) {
+      $this->InFooter = true;
+      $this->Footer();
+      $this->InFooter = false;
+    } else {
+      $this->blank = 0;
+    }
+    
+    $this->_endpage();
+    $this->_enddoc();
+  }
+  
   function AddPage($orientation = '', $size = '', $rotation = 0) {
     /* extension */
     $this->_flushblock();
