@@ -96,14 +96,21 @@ class JRestClient {
    }
 
    protected function exec() {
+      $xreqid = false;
       if (count($this->queryHeaders) > 0) {
          $headers = [];
          foreach($this->queryHeaders as $k => $v) {
             $headers[] = "$k: $v";
+            if (strtolower($k) === 'x-request-id') { $xreqid = true; }
          }
-
-         curl_setopt($this->ch, \CURLOPT_HTTPHEADER, $headers);
       }
+
+      if (!$xreqid) {
+         $headers[] = 'X-Request-Id: ' . uniqid();
+      }
+
+      curl_setopt($this->ch, \CURLOPT_HTTPHEADER, $headers);
+
       $ret = curl_exec($this->ch);
       $this->error = curl_error($this->ch);
       return $this->_return($ret);
@@ -264,7 +271,6 @@ class JRestClient {
       }
 
       $json = \json_decode($this->getVar('body_raw'), TRUE);
-      
       switch($this->getVar('http_code')) {
          default:
             return false;

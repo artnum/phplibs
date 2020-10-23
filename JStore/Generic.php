@@ -25,16 +25,13 @@
  * SUCH DAMAGE.
  */
 Namespace artnum\JStore;
-define('AUTH_NONE', 0);
-define('AUTH_AVAILABLE', 1);
-define('AUTH_OK', 10);
+
+define('RID_CACHE_SECONDS', 900);
+
 class Generic { 
   public $db;
   public $request;
   protected $dbs;
-  protected $auths;
-  protected $session;
-  protected $nosession;
   protected $signature;
   protected $lockManager;
   protected $data;
@@ -42,17 +39,11 @@ class Generic {
   
   function __construct($http_request = NULL, $dont_run = false, $options = []) {
     $this->dbs = [];
-    $this->auths = [];
     $this->signature = null;
     $this->_tstart = microtime(true);
     $this->lockManager = null;
     $this->data = [];
-    
-    if(isset($options['session'])) {
-      $this->session = $options['session'];
-    } else {
-      $this->session = new Session();
-    }
+    $this->ridCache = null;
 
     if (!empty($options['postprocess']) && is_array($options['postprocess'])) {
       foreach ($options['postprocess'] as $fn) {
@@ -61,11 +52,15 @@ class Generic {
         }
       }
     }
+
+    if (!empty($options['ridCache'])) {
+      $this->ridCache = $options['ridCache'];
+    }
     
     if(is_null($http_request)) {
       try {
         $this->request = new \artnum\HTTP\JsonRequest();
-      } catch(Exception $e) {
+      } catch(\Exception $e) {
         $this->fail($e->getMessage());
       }
     } else {
@@ -83,23 +78,6 @@ class Generic {
     }
 
     $this->dbs[$type][] = $db;
-  }
-
-  function add_auth($auth_source, $user, $serversig) {
-    $duplicate = false;
-    $auth_source = new $auth_source($this->session, $user, $serversig);
-    foreach($this->auths as $auth) {
-      if(strcmp($auth->getName(), $auth_source->getName()) == 0) {
-        $duplicate = true;
-      }
-    }
-
-    if($duplicate) {
-      return false;
-    } else {
-      $this->auths[] = $auth_source;
-    }
-    return true;
   }
 
   function set($name, $value) {
@@ -144,24 +122,6 @@ class Generic {
   /* Internal query */
   private function internal () {
     switch(strtolower(substr($this->request->getCollection(), 1))) {
-      case 'auth':
-        if(! $this->request->onItem()) {
-          $this->fail('Authentication must have an object');
-        } else {
-          $validation = false;
-          foreach($this->auths as $auth) {
-            $validation = $auth->handle($this->request);
-            if($validation) {
-              break;
-            }
-          }
-
-          if(!$validation) {
-            $this->fail('Authentication module fail');
-          }
-          file_put_contents('php://output', json_encode($validation));
-        }
-        break;
       case 'lock':
         if (! $this->lockManager) {
           $this->fail('No lock manager');
@@ -209,78 +169,38 @@ class Generic {
       foreach ($this->postprocessFunctions as $fn) {
         $fn($this->request);
       }
-    } catch(Exception $e) {
+    } catch(\Exception $e) {
       error_log('Postprocess error : ' . $e->getMessage());
     }
   }
-
         
   private function _t() {
     header('X-Artnum-execution-us: ' . intval((microtime(true) - $this->_tstart) * 1000000));
   }
 
   function run() {
-    $start = microtime(true);
-    $this->session->start();
-
-    /* In some case, Firefox send twice the same request. It seems that this
-     * behavior is triggered by extension (in my case firebug). I have seen
-     * this happen where no firebug was used so it might be linked to some
-     * extension. Anyway this mitigate this strange behavior.
-     */
-    switch (strtolower($this->request->getVerb())) {
-      case 'post': case 'put': case 'delete': case 'patch':
-        $history = $this->session->get('req-history');
-        if (!$history) {
-          $history = array($this->request->getId() => $start);
-        } else {
-          if (isset($history[$this->request->getId()])) {
-            error_log('Duplicate request with id : ' . $this->request->getId());
-            return 0;
-          }
-
-          $history[$this->request->getId()] = $start;
+    header('Content-Type: application/json');
+    if ($this->ridCache) {
+      $rid = $this->request->getId();
+      if (!empty($rid)) {
+        if ($this->ridCache->get($rid) === 1) {
+          error_log('Duplicate request with id : ' . $this->request->getId());
+          $this->fail('Duplicate requête', 304);
+          return 0;
         }
-
-        foreach($history as $k => $v) {
-          /* 15 min */
-          if (round($start - floatval($v)) > 900)  {
-            unset($history[$k]);
-          }
-        }
-
-        $this->session->set('req-history', $history);
-        break;
+      
+        $this->ridCache->set($rid, RID_CACHE_SECONDS);
+      }
     }
 
     if (substr($this->request->getCollection(), 0, 1) == '.') {
       $ret = $this->internal();
-      $this->session->close();
       return $ret;
     } 
 
     /* run user code */
     if(!ctype_alpha($this->request->getCollection())) {
       $this->fail('Collection not valid');
-    }
-
-    /* authorize request, if available 
-
-     */
-    $authorize = AUTH_NONE;
-    foreach($this->auths as $auth) {
-      if($auth->verify($this->request)) {
-        $authorize = AUTH_AVAILABLE;
-        if($auth->authorize($this->request)) {
-          $this->fail('Forbidden', 403);
-        } else {
-          $authorize = AUTH_OK;
-        }
-        break;
-      }
-    }
-    if ($authorize != AUTH_NONE && $authorize != AUTH_OK) {
-      $this->fail('Forbidden', 403);
     }
 
     /* prepare model */
@@ -293,7 +213,6 @@ class Generic {
       $model = new $model(NULL, NULL);
       $model->set_db($this->_db($model));
       $controller = new \artnum\JStore\HTTP($model, NULL);
-      $this->session->close();
       
       $results = array('success' => false, 'type' => 'results', 'data' => null, 'length' => 0);
       $action = strtolower($this->request->getVerb()) . 'Action';
@@ -304,13 +223,13 @@ class Generic {
       switch(strtolower($this->request->getVerb())) {
         default:
           if (isset($results['result'])) {
-            $body = json_encode(array(
-              'success' => $results['success'],
-              'type' => 'results',
-              'message' => $results['msg'],
-              'data' => $results['result']->getItems(),
-              'length' => $results['result']->getCount()
-            ));
+            $body = '{' . 
+              '"success":' . ($results['success'] ? 'true' : 'false') . ', ' . 
+              '"type": "results", ' . 
+              '"message": "' . $results['msg'] . '", ' . 
+              '"data": ' . $results['result']->toJson() . ', ' .
+              '"length": ' . $results['result']->getCount() .
+              '}';
           } else {
             $body = json_encode(array(
               'success' => $results['success'],
@@ -320,11 +239,11 @@ class Generic {
               'length' => $results['data'][1]
             ));
           }
-
+          if (!$body) {
+            $this->fail(json_last_error_msg());
+          }
           $reqId = $this->request->getClientReqId();
-          if ($reqId) {
-            header('X-Request-ID: ' . $reqId);
-          } else {
+          if (!$reqId) {
             $reqId = '';
           }
 
@@ -357,7 +276,7 @@ class Generic {
           $this->postprocess();
           break;
       }
-    } catch(Exception $e) {
+    } catch(\Exception $e) {
       $this->fail($e->getMessage());
     }
   }
