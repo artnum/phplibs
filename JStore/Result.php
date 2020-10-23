@@ -28,6 +28,8 @@ Namespace artnum\JStore;
 
 class Result {
   protected $items;
+  protected $noJsonStream = false;
+  protected $itemsJson = [];
   protected $count;
   protected $errors;
   
@@ -38,7 +40,26 @@ class Result {
   }
   
   function getCount () {
+    if (!$this->noJsonStream && count($this->itemsJson) > 0) {
+      return count($this->itemsJson);
+    }
     return $this->count;
+  }
+
+  function getItem ($i) {
+    if ($i < $this->count) {
+      return $this->items[$i];
+    }
+    return null;
+  }
+
+  function setItem ($i, $item) {
+    $this->noJsonStream = true;
+    if ($i < $this->count) {
+      $this->items[$i] = $item;
+      return true;  
+    }
+    return false;
   }
 
   function getItems () {
@@ -50,6 +71,7 @@ class Result {
   }
 
   function setItems ($items) {
+    $this->noJsonStream = true;
     $this->items = $items;
   }
 
@@ -60,6 +82,12 @@ class Result {
     }
     if (is_array($this->items)) {
       $this->items[] = $item;
+      $jitem = json_encode($item);
+      if ($jitem !== FALSE) {
+        $this->itemsJson[] = $jitem;
+      } else {
+        $this->addError(json_last_error_msg(), $item);
+      }
       $this->count++;
     }
   }
@@ -67,6 +95,14 @@ class Result {
   function copyError ($src) {
     if ($src instanceof \artnum\JStore\Result) {
       $this->errors = array_merge($this->errors, $src->getError());
+    }
+  }
+
+  function toJson() {
+    if (!$this->noJsonStream && count($this->itemsJson) > 0) {
+      return '[' . implode(',', $this->itemsJson) . ']';
+    } else {
+      return json_encode($this->items);
     }
   }
   
