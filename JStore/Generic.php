@@ -178,7 +178,7 @@ class Generic {
     header('X-Artnum-execution-us: ' . intval((microtime(true) - $this->_tstart) * 1000000));
   }
 
-  function run() {
+  function run($conf = null) {
     header('Content-Type: application/json');
     if ($this->ridCache) {
       $rid = $this->request->getId();
@@ -210,10 +210,26 @@ class Generic {
     }
     
     try {
-      $model = new $model(NULL, NULL);
+      $model = new $model(NULL, $conf);
       $model->set_db($this->_db($model));
       $controller = new \artnum\JStore\HTTP($model, NULL);
       
+      if (method_exists($model, 'getCacheOpts')) {
+        $copts = $model->getCacheOpts();
+        if (!empty($copts['age']) && is_int($copts['age'])) {
+          $maxage = ', max-age=' . $copts['age'];
+          if ($copts['public']) {
+            header('Cache-Control: public' . $maxage);
+          } else {
+            header('Cache-Control: private' . $maxage);
+          }
+        } else {
+          header('Cache-Control: no-store, max-age=0');
+        }
+      } else {
+        header('Cache-Control: no-store, max-age=0');
+      }
+
       $results = array('success' => false, 'type' => 'results', 'data' => null, 'length' => 0);
       $action = strtolower($this->request->getVerb()) . 'Action';
       $results = $controller->$action($this->request);

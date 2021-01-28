@@ -36,9 +36,9 @@ class LDAP extends \artnum\JStore\OP {
     $this->DB = $db;
     $this->base = $base;
     $this->Config = $config;
-    $this->Binary = array();
+    $this->Binary = [];
     
-    if(is_array($this->Config['binary'])) {
+    if(isset($this->Config['binary']) && is_array($this->Config['binary'])) {
       foreach($this->Config['binary'] as $b) {
         $this->Binary[] = strtolower($b);
       }
