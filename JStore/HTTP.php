@@ -38,17 +38,18 @@ class HTTP extends \artnum\HTTP\CORS
     try {
       if($req->onCollection()) {
         return array(
-          'last-id' => $this->Model->getLastId($req->getParameters()),
-          'last-modification' => $this->Model->getTableLastMod());
+          'last-id' => method_exists($this->Model, 'getLastId') ? $this->Model->getLastId($req->getParameters()) : -1,
+          'last-modification' => method_exists($this->Model, 'getTableLastMod') ? $this->Model->getTableLastMod() : -1);
       } else if($req->onItem()) {
         if($this->Model->exists($req->getItem())) {
-          return array('last-modification' => $this->Model->getLastMod($req->getItem()),
-                       'deleted' => $this->Model->getDeleteDate($req->getItem()), 'exists' => 1);
+          return array('last-modification' => method_exists($this->Model, 'getLastMod') ? $this->Model->getLastMod($req->getItem()) : -1,
+                       'deleted' => method_exists($this->Model, 'getDeleteDate') ? $this->Model->getDeleteDate($req->getItem()) : -1,
+                       'exists' => 1);
         } else {
           return array('error' => 'Does not exist', 'exists' => 0);
         }
       }
-    } catch(Exception $e) {
+    } catch(\Exception $e) {
       return array('error' => $e->getMessage());
     }
   }
@@ -117,7 +118,7 @@ class HTTP extends \artnum\HTTP\CORS
       } else {
         $retVal['result'] = $results;
       }
-    } catch(Exception $e) {
+    } catch(\Exception $e) {
       $retVal['msg'] = $e->getMessage();
     }
     return $retVal;
@@ -143,7 +144,7 @@ class HTTP extends \artnum\HTTP\CORS
         } else {
           $retVal['msg'] = 'Write failed';
         }
-      } catch(Exception $e) {
+      } catch(\Exception $e) {
         $retVal['msg'] = 'Write failed';
       }
     }
@@ -166,11 +167,11 @@ class HTTP extends \artnum\HTTP\CORS
       $ret = $this->Model->search($req->getParameters());
       if ($ret) {
         $retVal['success'] = true;
-        if (is_array($result)) {
-          $retVal['result']->setItems($result[0]);
-          $retVal['result']->setCount($result[1]);
+        if (is_array($ret)) {
+          $retVal['result']->setItems($ret[0]);
+          $retVal['result']->setCount($ret[1]);
         } else {
-          $retVal['result'] = $result;
+          $retVal['result'] = $ret;
         }
       }
     } else {
@@ -187,7 +188,7 @@ class HTTP extends \artnum\HTTP\CORS
         } else {
           $retVal['msg'] = 'Write failed';
         }
-      } catch(Exception $e) {
+      } catch(\Exception $e) {
         $retVal['msg'] = $e->getMessage();
       }
     }
@@ -209,7 +210,7 @@ class HTTP extends \artnum\HTTP\CORS
         } else {
           $retVal['result'] = $result;
         }
-      } catch(Exception $e) {
+      } catch(\Exception $e) {
         $retVal['msg'] = $e->getMessage();
       }
     }

@@ -115,9 +115,13 @@ class LDAPDB {
       if(!isset($this->Res[$type])) { return NULL; }
     }
 
-    if(count($this->Res[$type]) == 1) {
+    if(count($this->Res[$type]) === 1) {
       $this->Selected[$t] = $this->Res[$type][0];
     } else {
+      if (empty($this->Res[$type])) {
+        $type = $type === 'ro' ? 'rw' : 'ro';
+        if (empty($this->Res[$type])) { return NULL; }
+      }
       $this->Selected[$t] = $this->Res[$type][rand(0, count($this->Res[$type]) - 1)];
     }
 

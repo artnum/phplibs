@@ -233,11 +233,11 @@ class Generic {
       $results = array('success' => false, 'type' => 'results', 'data' => null, 'length' => 0);
       $action = strtolower($this->request->getVerb()) . 'Action';
       $results = $controller->$action($this->request);
-      if ($results['success']) {
-        $results['msg'] = 'OK';
-      }
       switch(strtolower($this->request->getVerb())) {
         default:
+          if ($results['success']) {
+            $results['msg'] = 'OK';
+          }
           if (isset($results['result'])) {
             $body = '{' . 
               '"success":' . ($results['success'] ? 'true' : 'false') . ', ' . 

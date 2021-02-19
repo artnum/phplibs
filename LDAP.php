@@ -95,6 +95,19 @@ class LDAP extends \artnum\JStore\OP {
     return NULL;
   }
 
+  function get($dn, $conn) {
+    try {
+      $dn = $this->_dn($dn);
+      $res = @ldap_read($conn, $dn, '(objectclass=*)', $this->Attribute);
+      if ($res && ldap_count_entries($conn, $res) === 1) {
+        return ldap_first_entry($conn, $res);
+      }
+      return NULL;
+    } catch (\Exception $e) {
+      return NULL;
+    }
+  }
+
   function _read($dn) {
     $result = new \artnum\JStore\Result();
     try {
@@ -307,9 +320,9 @@ class LDAP extends \artnum\JStore\OP {
 
     if ($sub != null) {
       if (is_array($sub)) {
-        $subTxt = join(',', $sub);
+        $sub = join(',', $sub);
       } else {
-        $subTxt = $sub;
+        $sub = $sub;
       }
       $base = sprintf('%s,%s', $sub, $base);
     }
@@ -331,6 +344,7 @@ class LDAP extends \artnum\JStore\OP {
   }
   
   function do_write ($data, $overwrite = false) {
+    $result = new \artnum\JStore\Result();
     $conn = $this->DB->writable();
 
     $singleValue = $this->conf('singleValue');
@@ -343,13 +357,16 @@ class LDAP extends \artnum\JStore\OP {
     if (!$attrsToBuild) { $attrsToBuild = array(); }
     
     if (isset($data['IDent'])) {
-      $entry = $this->get(rawurldecode($data['IDent']), $conn);
+      $ident = rawurldecode($data['IDent']);
+      $entry = $this->get($ident, $conn);
+      if ($entry === NULL) { $result->addError('Unknown entry'); return $result; }
       $dn = ldap_get_dn($conn, $entry);
       $mods = array();
       $entryVal = array();
       $ber = null;
-      for ($attr = ldap_first_attribute($conn, $entry, $ber); $attr !== FALSE; $attr = ldap_next_attribute($conn, $entry, $ber)) {
+      for ($attr = ldap_first_attribute($conn, $entry, $ber); $attr; $attr = ldap_next_attribute($conn, $entry, $ber)) {
         $attr = strtolower($attr);
+        if (!isset($data[$attr])) { continue; } // skip attribute not yet set
         if (!is_array($data[$attr])) { $data[$attr] = array($data[$attr]); }
         
         /* decode binary attributes from base64 */
@@ -382,24 +399,40 @@ class LDAP extends \artnum\JStore\OP {
         $mods[] = array('attrib' => $k, 'modtype' => LDAP_MODIFY_BATCH_ADD, 'values' => $v);
       }     
       
+      $modResults = [];
+      $fullSuccess = true;
       foreach ($mods as $mod) {
         if (in_array($mod['attrib'], $singleValue) &&
             $mod['modtype'] !== LDAP_MODIFY_BATCH_REMOVE_ALL && count($mod['values']) > 1) {
           $mod['values'] = array($mod['values'][0]);
         }
-        switch ($mod['modtype']) {
-          case LDAP_MODIFY_BATCH_REMOVE_ALL:
-            ldap_mod_del($conn, $dn, $mod['attrib']); break;
-          case LDAP_MODIFY_BATCH_ADD:
-            ldap_mod_add($conn, $dn, array($mod['attrib'] => $mod['values'])); break;
-          case LDAP_MODIFY_BATCH_REPLACE:
-            ldap_mod_replace($conn, $dn, array($mod['attrib'] => $mod['values'])); break;
+        try {
+          $r = false;
+          switch ($mod['modtype']) {
+            case LDAP_MODIFY_BATCH_REMOVE_ALL:
+              $r = @ldap_mod_del($conn, $dn, $mod['attrib']);
+              $modResults[] = [$mod['attrib'] => $r, 'op' => 'remove']; break;
+            case LDAP_MODIFY_BATCH_ADD:
+              $r = @ldap_mod_add($conn, $dn, array($mod['attrib'] => $mod['values']));
+              $modResults[] = [$mod['attrib'] => $r, 'op' => 'add']; break;
+            case LDAP_MODIFY_BATCH_REPLACE:
+              $r = @ldap_mod_replace($conn, $dn, array($mod['attrib'] => $mod['values']));
+              $modResults[] = [$mod['attrib'] => $r, 'op' => 'modify']; break;
+          }
+          if ($r === false) { $fullSuccess = false; }
+        } catch (\Exception $e) {
+          $result->addError($e->getMessage());
         }
       }
+      $result->addItem(['IDent' => $ident, 'success' => $fullSuccess, 'op' => 'edit', 'details' => $modResults]);
     } else {
       $rdnVal = $this->getRdnValue($data);
       $dn = $this->buildDn($rdnVal);
-      $entry = array('objectclass' => $this->conf('objectclass'), $this->conf('rdnAttr') => array($rdnVal));
+      if (is_callable($this->conf('objectclass'))) {
+        $entry = ['objectclass' => $this->conf('objectclass')($data), $this->conf('rdnAttr') => array($rdnVal)];
+      } else {
+        $entry = ['objectclass' => $this->conf('objectclass'), $this->conf('rdnAttr') => array($rdnVal)];
+      }
       foreach ($data as $k => $v) {
         switch ($k) {
           case 'dn':
@@ -416,7 +449,6 @@ class LDAP extends \artnum\JStore\OP {
             break;
         }
       }
-
       foreach ($attrsToBuild as $k => $v) {
         $value = $v;
         foreach ($entry as $_k => $_v) {
@@ -424,17 +456,27 @@ class LDAP extends \artnum\JStore\OP {
         }
         $entry[$k] = array($value);
       }
-      ldap_add($conn, $dn, $entry);
+      try {
+        if (@ldap_add($conn, $dn, $entry)) {
+          $dn = ldap_explode_dn($dn, 0);
+          $ident = rawurlencode($dn[0]);
+          $result->addItem(['IDent' => $ident, 'succes' => true, 'op' => 'add']);
+        } else {
+          $result->addItem(['IDent' => null, 'success' => false, 'op' => 'add']);
+          $result->addError(ldap_error($conn));
+        }
+      } catch (\Exception $e) {
+        $result->addError($e->getMessage());
+      }
     }
+    return $result;
   }
   
   function _write ($data) {
-    $this->do_write($data);
-    return null;
+    return $this->do_write($data);
   }
   function _overwrite ($data) {
-    $this->do_write($data, true);
-    return null;
+    return $this->do_write($data, true);
   }
 }
 ?>
