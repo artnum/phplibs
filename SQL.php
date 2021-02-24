@@ -692,10 +692,6 @@ class SQL extends \artnum\JStore\OP {
   }
 
   function update($data) {
-    $columns = array();
-    $values = array();
-
-
     $id = $data[$this->IDName];
     if(isset($data[$this->IDName])) {
       unset($data[$this->IDName]);
