@@ -372,6 +372,12 @@ class LDAP extends \artnum\JStore\OP {
       $ber = null;
       for ($attr = ldap_first_attribute($conn, $entry, $ber); $attr; $attr = ldap_next_attribute($conn, $entry, $ber)) {
         $attr = strtolower($attr);
+        /* request for delete of attribute */
+        if (isset($data['-' . $attr])) {
+          $mods[] = ['attrib' => $attr, 'modtype' => LDAP_MODIFY_BATCH_REMOVE_ALL];
+          unset($data['-' . $attr]);
+          continue;
+        }
         if (!isset($data[$attr])) { continue; } // skip attribute not yet set
         if (!is_array($data[$attr])) { $data[$attr] = array($data[$attr]); }
         
@@ -416,7 +422,7 @@ class LDAP extends \artnum\JStore\OP {
           $r = false;
           switch ($mod['modtype']) {
             case LDAP_MODIFY_BATCH_REMOVE_ALL:
-              $r = @ldap_mod_del($conn, $dn, $mod['attrib']);
+              $r = ldap_mod_del($conn, $dn, [$mod['attrib'] => []]);
               $modResults[] = [$mod['attrib'] => $r, 'op' => 'remove']; break;
             case LDAP_MODIFY_BATCH_ADD:
               $r = @ldap_mod_add($conn, $dn, array($mod['attrib'] => $mod['values']));
