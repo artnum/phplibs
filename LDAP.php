@@ -338,7 +338,13 @@ class LDAP extends \artnum\JStore\OP {
     $ctx = hash_init('sha1',  HASH_HMAC, date('c'));
     foreach ($data as $k => $v) {
       hash_update($ctx, $k);
-      hash_update($ctx, $v);
+      if (is_array($v)) {
+        foreach ($v as $_v) {
+          hash_update($ctx, $_v);  
+        }
+      } else {
+        hash_update($ctx, $v);
+      }
     }
     return hash_final($ctx);
   }
@@ -460,7 +466,7 @@ class LDAP extends \artnum\JStore\OP {
         if (@ldap_add($conn, $dn, $entry)) {
           $dn = ldap_explode_dn($dn, 0);
           $ident = rawurlencode($dn[0]);
-          $result->addItem(['IDent' => $ident, 'succes' => true, 'op' => 'add']);
+          $result->addItem(['IDent' => $ident, 'success' => true, 'op' => 'add']);
         } else {
           $result->addItem(['IDent' => null, 'success' => false, 'op' => 'add']);
           $result->addError(ldap_error($conn));
