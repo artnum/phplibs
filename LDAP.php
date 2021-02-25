@@ -50,7 +50,7 @@ class LDAP extends \artnum\JStore\OP {
         $this->Attribute[] = strtolower($attr);
       }
     } else {
-      $this->Attribute = NULL;
+      $this->Attribute = null;
     }
   }
 
@@ -98,7 +98,7 @@ class LDAP extends \artnum\JStore\OP {
   function get($dn, $conn) {
     try {
       $dn = $this->_dn($dn);
-      $res = @ldap_read($conn, $dn, '(objectclass=*)', $this->Attribute);
+      $res = @ldap_read($conn, $dn, '(objectclass=*)', $this->Attribute ?? ['*']);
       if ($res && ldap_count_entries($conn, $res) === 1) {
         return ldap_first_entry($conn, $res);
       }
@@ -113,7 +113,7 @@ class LDAP extends \artnum\JStore\OP {
     try {
       $c = $this->DB->readable();
       $dn = rawurldecode($dn);
-      $res = @ldap_read($c, $this->_dn($dn), '(objectclass=*)', $this->Attribute);
+      $res = @ldap_read($c, $this->_dn($dn), '(objectclass=*)', $this->Attribute ?? ['*']);
       if($res && ldap_count_entries($c, $res) == 1) {
         $entry = $this->processEntry($c, ldap_first_entry($c, $res), $result);
         if ($entry) {
