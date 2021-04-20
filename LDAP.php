@@ -305,7 +305,7 @@ class LDAP extends \artnum\JStore\OP {
     if (!empty($options['limit']) && ctype_digit(($options['limit']))) {
       $limit = intval($options['limit']);
     }
-    $res = @ldap_list($c, $this->_dn(), $filter, $this->Attribute, 0, $limit);
+    $res = @ldap_list($c, $this->_dn(), $filter, $this->Attribute ?? [ '*' ], 0, $limit);
     if($res) {
       for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
         $result->addItem($this->processEntry($c, $e, $result));
