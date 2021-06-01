@@ -242,6 +242,7 @@ class Generic {
             $body = '{' . 
               '"success":' . ($results['success'] ? 'true' : 'false') . ', ' . 
               '"type": "results", ' . 
+              '"store": "' . $this->request->getCollection() . '", ' . 
               '"message": "' . $results['msg'] . '", ' . 
               '"data": ' . $results['result']->toJson() . ', ' .
               '"length": ' . $results['result']->getCount() .
@@ -250,6 +251,7 @@ class Generic {
             $body = json_encode(array(
               'success' => $results['success'],
               'type' => 'results',
+              'store' => $this->request->getCollection(),
               'message' => $results['msg'],
               'data' => $results['data'][0],
               'length' => $results['data'][1]
