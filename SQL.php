@@ -764,7 +764,11 @@ class SQL extends \artnum\JStore\OP {
 
     /* Write to an item undelete it, except if specified no to do so */
     if (!is_null($this->conf('delete')) && !$this->conf('delete.no-auto-undelete')) {
-      $prefixed[$this->conf('delete')] = NULL;
+      if ($this->conf('delete.zero')) {
+        $prefixed[$this->conf('delete')] = 0;
+      } else {
+        $prefixed[$this->conf('delete')] = NULL;
+      }
     }
 
     if(empty($prefixed[$this->IDName])) {
