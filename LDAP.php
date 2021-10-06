@@ -268,7 +268,12 @@ class LDAP extends \artnum\JStore\OP {
         $attr = ldap_next_attribute($conn, $ldapEntry, $_ber)
       ) {
         $attr = strtolower($attr);
-        if (!is_null($attributes) && !in_array($attr, $attributes)) { continue; }
+        $checkAttr = $attr;
+        $options = null;
+        if (strpos($attr, ';')) {
+          [$checkAttr, $options] = explode(';', $attr, 2);
+        }
+        if (!is_null($attributes) && !in_array($checkAttr, $attributes)) { continue; }
 
         $value = array();
         if (in_array($attr, $this->Binary)) {
@@ -285,7 +290,14 @@ class LDAP extends \artnum\JStore\OP {
         if (count($value) <= 0) { continue; }
         if (count($value) === 1) { $value = $value[0]; }
 
-        $entry[$attr] = $value;
+        if($options) {
+          if (!isset($entry[$checkAttr . ';'])) {
+            $entry[$checkAttr . ';'] = [];
+          }
+          $entry[$checkAttr . ';'][$options] = $value;
+        } else {
+          $entry[$attr] = $value;
+        }
       }
     } catch (\Exception $e) {
       $result->addError($e->getMessage(), $e);
@@ -456,15 +468,20 @@ class LDAP extends \artnum\JStore\OP {
             if (in_array($k, $singleValue) && count($entry[$k]) === 1) {
               break;
             }
-
-            $entry[$k][] = $v;
+            if (is_array($v)) {
+              foreach ($v as $_v) {
+                $entry[$k][] = $_v;
+              }
+            } else {
+              $entry[$k][] = $v;
+            }
             break;
         }
       }
       foreach ($attrsToBuild as $k => $v) {
         $value = $v;
         foreach ($entry as $_k => $_v) {
-          $value = str_replace('%' . $_k, $_v[0], $value);
+          $value = str_replace('%' . strtolower($_k), $_v[0], $value);
         }
         $entry[$k] = array($value);
       }
