@@ -306,6 +306,102 @@ class SQL extends \artnum\JStore\OP {
     }
   }
 
+  function query ($body, &$params, &$count) {
+    if ($params === null) { $params = []; }
+    if ($count === null) { $count = 0; }
+    $predicats = [];
+    $relation = ' AND ';
+    foreach ($body as $key => $value) {
+      if (substr($key, 0, 1) === '#') {
+        switch (strtolower($key)) {
+          case '#or':
+            $relation = ' OR ';
+            break;
+          case '#and':
+            $relation = ' AND ';
+            break;
+          case '#xor':
+            $relation = ' XOR ';
+        }
+        
+        $predicats[] = '( ' . $this->query($value, $params, $count) . ' )';
+      } else {
+        $type = 'str';
+        if (isset($value[2])) {
+          switch (strtolower($value[2])) {
+            case 'int':
+            case 'integer':
+              $type = 'int';
+              break;
+            case 'boolean':
+            case 'bool':
+              $type = 'bool';
+              break;
+            case 'null':
+              $type = 'null';
+              break;
+            default:
+              $type = 'str';
+              break;
+          }
+        }
+        $novalue = false;
+        $nullify = false;
+        $operator = '';
+        $predicat = '';
+
+        $effectiveKey = explode(':', $key)[0];
+        switch ($value[0]) {
+          case '<=':
+          case '>=':
+          case '>':
+          case '<':
+          case '=': $operator = $value[0]; break;
+          case '~': $operator = 'LIKE'; break;
+          case '!=' : $operator = '<>'; break;
+          case '--':
+            $nullify = true;
+            // fall through
+          case '-': $operator = 'IS NULL'; $novalue = true; break;
+          case '**':
+            $nullify = true;
+            // fall through
+          case '*': $operator = 'IS NOT NULL'; $novalue = true; break;
+        }
+
+        $table = $this->conf('Table');
+        $attr = $effectiveKey;
+        if (strpos($effectiveKey, '_')) {
+          [$table, $attr] = explode('_', $key, 2);
+        }
+        if ($nullify) {
+          $predicat = 'NULLIF("' . $table . '"."' . $table . '_' . $attr . '", \'\') ' . $operator;
+        } else {
+          $predicat = '"' . $table . '"."' . $table . '_' . $attr . '" ' . $operator;
+        }
+        if (!$novalue) {
+          $predicat .= ' :params' . $count;
+          $v = strval($value[1]);
+          switch($type) {
+            case 'bool':
+              $v = boolval($value[1]);
+              break;
+            case 'int':
+              $v = intval($value[1]);
+              break;
+            case 'null':
+              $v = null;
+              break;
+          }
+          $params[':params' . $count] = [$v, $type];
+          $count++;
+        }
+        $predicats[] = $predicat;
+      }
+    }
+    return join($relation, $predicats);
+  }
+
   function prepareSearch($searches) {
     $whereClause = '';
     $op = ''; $no_value = false; $s = array();
@@ -548,6 +644,54 @@ class SQL extends \artnum\JStore\OP {
     return $entry;
   }
   
+  function search($body, $options) {
+    $result = new \artnum\JStore\Result();
+    $statement = $this->req('get');
+    $params = [];
+    $count = 0;
+
+    $statement .= ' WHERE ' . $this->query($body, $params, $count);    
+    if(! empty($options['sort'])) {
+      $statement .= ' ' . $this->prepareSort($options['sort']);
+    }
+    if(! empty($options['limit'])) {
+      $statement .= ' ' . $this->prepareLimit($options['limit']);
+    }  
+
+    try {
+      $st = $this->get_db(true)->prepare($statement);
+      foreach ($params as $key => $value) {
+        switch($value[1]) {
+          default:
+          case 'str': 
+            $st->bindValue($key, $value[0], \PDO::PARAM_STR); break;
+          case 'int':
+            $st->bindValue($key, $value[0], \PDO::PARAM_INT); break;
+          case 'bool':
+            $st->bindValue($key, $value[0], \PDO::PARAM_BOOL); break;
+          case 'null':
+            $st->bindValue($key, $value[0], \PDO::PARAM_NULL); break;
+        }
+      }
+      if (!$st->execute()) {
+        $result->addError($st->errorInfo()[2], $st->errorInfo());
+        return $result;
+      }
+      $ids = [];
+      while ($row = $st->fetch(\PDO::FETCH_ASSOC)) {
+        if (in_array($row[$this->IDName], $ids)) { continue; }
+        $ids[] = $row[$this->IDName];
+        $row = $this->_postprocess($this->unprefix($row));
+        $row = $this->extendEntry($row, $result);
+        $result->addItem($row);
+      }
+    } catch (\Exception $e) {
+      $result->addError($e->getMessage(), $e);
+    }
+
+    return $result;
+  }
+
   function listing($options) {
     $result = new \artnum\JStore\Result();
     $ids = array();
@@ -583,16 +727,14 @@ class SQL extends \artnum\JStore\OP {
       if ($results[1] !== 1) {
         $result->addError('Not one result as expected');
       } else {
-        $result->setItems($results[0][0]);
-        $result->setCount(1);
+        $result->addItem($results[0][0]);
       }
     } else {
       $result->copyError($results);
       if($results->getCount() !== 1) {
         $result->addError('Not one result as expected');
       } else {
-        $result->setItems($results->getItems()[0]);
-        $result->setCount(1);
+        $result->addItem($results->getItems()[0]);
       }
     }
 
