@@ -163,35 +163,53 @@ class HTTP extends \artnum\HTTP\CORS
       'success' => false,
       'msg' => 'Generic error',
       'result' => new Result());
-    if ($req->onItem() && $req->getItem() === '.search') {
-      $ret = $this->Model->search($req->getParameters());
-      if ($ret) {
-        $retVal['success'] = true;
-        if (is_array($ret)) {
-          $retVal['result']->setItems($ret[0]);
-          $retVal['result']->setCount($ret[1]);
-        } else {
-          $retVal['result'] = $ret;
-        }
-      }
-    } else {
-      try {
-        $result = $this->Model->overwrite($req->getParameters(), $req->getItem());
-        if ($result) {
+    if ($req->onItem()) {
+      $item = $req->getItem();
+      if ($item === '.search') {
+        $ret = $this->Model->search($req->getParameters());
+        if ($ret) {
           $retVal['success'] = true;
-          if (is_array($result)) {
-            $retVal['result']->setItems($result[0]);
-            $retVal['result']->setCount($result[1]);
+          if (is_array($ret)) {
+            $retVal['result']->setItems($ret[0]);
+            $retVal['result']->setCount($ret[1]);
           } else {
-            $retVal['result'] = $result;
+            $retVal['result'] = $ret;
           }
-        } else {
-          $retVal['msg'] = 'Write failed';
         }
-      } catch(\Exception $e) {
-        $retVal['msg'] = $e->getMessage();
+        return $retVal;
+      }
+      if ($item === '_query') {
+        if (!is_callable([$this->Model, 'query'])) { 
+          $retVal['result']->addError('No available');
+          return $retVal;
+        }
+
+        $res = $this->Model->search($req->getBody(), $req->getParameters());
+        if ($res) {
+          $retVal['success'] = true;
+          $retVal['result'] = $res;
+        }
+        return $retVal;
       }
     }
+
+    try {
+      $result = $this->Model->overwrite($req->getParameters(), $req->getItem());
+      if ($result) {
+        $retVal['success'] = true;
+        if (is_array($result)) {
+          $retVal['result']->setItems($result[0]);
+          $retVal['result']->setCount($result[1]);
+        } else {
+          $retVal['result'] = $result;
+        }
+      } else {
+        $retVal['msg'] = 'Write failed';
+      }
+    } catch(\Exception $e) {
+      $retVal['msg'] = $e->getMessage();
+    }
+  
     return $retVal;
   }
   
