@@ -51,7 +51,6 @@ class Menshen
 
       $success = $rsa->verify($mid, $auth['sig']);
       if (!$this->certStore->endCheck($auth['cid'], $success, $this->storePriv)) {
-        echo 'E';
         return false;
       }
       $this->Auth = $auth;
