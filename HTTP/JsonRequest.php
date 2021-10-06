@@ -41,7 +41,7 @@ class JsonRequest extends Path
   function __construct()
   {
     parent::__construct();
-
+    $this->body = null;
     /* this work with Collection/Item only. Item as a path is useful, so
      * join back Collection/i/t/em into [Collection][i/t/ek]
      */
@@ -121,6 +121,10 @@ class JsonRequest extends Path
     if(count($this->url_elements) == 1) return true;
     return false;
     
+  }
+
+  function getBody() {
+    return $this->body;
   }
 
   function onItem() {
@@ -249,11 +253,12 @@ class JsonRequest extends Path
     }
 
     $content = file_get_contents('php://input');
-
-    if($content != FALSE) {
+    if($content !== FALSE) {
       hash_update($this->hashCtx, $content);
       if(isset($_SERVER['CONTENT_TYPE']) && strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
+        $body = [];
         foreach($this->_parse_str($content) as $_k => $_v) {
+          $body[$_k] = $_v;
           if(!empty($params[$_k])) {
             if(is_array($params[$_k])) {
               $params[$_k][] = $_v;
@@ -264,9 +269,11 @@ class JsonRequest extends Path
             $params[$_k] = $_v;
           }
         }
+        $this->body = $body;
       }  else {
         $json_root = json_decode($content, true);
         if($json_root) {
+          $this->body = $json_root;
           foreach($json_root as $_k => $_v) {
             if (strcmp($_k, '_qid') === 0) {
               if (is_string($_v)) {
