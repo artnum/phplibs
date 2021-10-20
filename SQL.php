@@ -312,6 +312,14 @@ class SQL extends \artnum\JStore\OP {
     $predicats = [];
     $relation = ' AND ';
     foreach ($body as $key => $value) {
+      if (!is_array($value)) {
+        $value = ['=', $value, gettype($value)];
+      }
+      if (count($value) === 1) {
+        $value = ['=', $value[0], gettype($value[0])];
+      } else if (count($value) === 2) {
+        $value = [$value[0], $value[1], gettype($value[1])];
+      }
       if (substr($key, 0, 1) === '#') {
         switch (strtolower($key)) {
           case '#or':

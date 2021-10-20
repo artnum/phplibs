@@ -146,6 +146,80 @@ class LDAP extends \artnum\JStore\OP {
     return FALSE;
   }
 
+  function query ($body, &$params, &$count) {
+    if ($params === null) { $params = []; }
+    if ($count === null) { $count = 0; }
+    $predicats = [];
+    $relation = ' AND ';
+    foreach ($body as $key => $value) {
+      if (!is_array($value)) {
+        $value = ['=', $value, gettype($value)];
+      }
+      if (count($value) === 1) {
+        $value = ['=', $value[0], gettype($value[0])];
+      } else if (count($value) === 2) {
+        $value = [$value[0], $value[1], gettype($value[1])];
+      }
+      if (substr($key, 0, 1) === '#') {
+        switch (strtolower($key)) {
+          case '#or':
+            $relation = '|';
+            break;
+          case '#and':
+            $relation = '&';
+            break;
+        }
+        
+        $predicats[] = '(' . $relation . '(' . $this->query($value, $params, $count) . '))';
+      } else {
+        $type = 'str';
+        if (isset($value[2])) {
+          switch (strtolower($value[2])) {
+            case 'int':
+            case 'integer':
+              $type = 'int';
+              break;
+            default:
+              $type = 'str';
+              break;
+          }
+        }
+        $novalue = false;
+        $predicat = '';
+
+        $effectiveKey = explode(':', $key)[0];
+        $valuePlaceHolder = ':params' . $count;
+        switch ($value[0]) {
+          case '<=':
+          case '>=':
+          case '>':
+          case '<':
+          case '=': $predicat = $effectiveKey . $value[0] . $valuePlaceHolder;  break;
+          case '~': $predicat = $effectiveKey . '=~' . $valuePlaceHolder;; break;
+          case '!=' : $predicat = '!(' . $effectiveKey . '=' . $valuePlaceHolder . ')'; break;
+          case '--':
+          case '-': 
+            $predicat = '!(' . $effectiveKey . '=*)'; $novalue = true; break;
+          case '**':
+          case '*': 
+            $predicat = $effectiveKey . '=*'; $novalue = true; break;
+        }
+        if (!$novalue) {
+          $v = strval($value[1]);
+          switch($type) {
+            case 'int':
+              $v = intval($value[1]);
+              break;
+            }
+          $params[':params' . $count] = [$v, $type];
+          $count++;
+        }
+        $predicats[] = '(' . $predicat . ')';
+      }
+    }
+    return join('', $predicats);
+  }
+
   function prepareSearch($searches) {
     $op = ''; $s = 0;
     if(! is_array($searches)) {
@@ -305,6 +379,32 @@ class LDAP extends \artnum\JStore\OP {
     return $entry;
   }
   
+  function search($body, $options) {
+    $result = new \artnum\JStore\Result();
+    $c = $this->DB->readable();
+
+    $params = [];
+    $count = 0;
+    $filter = $this->query($body, $params, $count);
+
+    $limit = 0;
+    if (!empty($options['limit']) && ctype_digit(($options['limit']))) {
+      $limit = intval($options['limit']);
+    }
+
+    foreach ($params as $k => $v) {
+      $filter = str_replace($k, ldap_escape($v[0], '', LDAP_ESCAPE_FILTER), $filter);
+    }
+
+    $res = @ldap_list($c, $this->_dn(), $filter, $this->Attribute ?? [ '*' ], 0, $limit);
+    if($res) {
+      for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
+        $result->addItem($this->processEntry($c, $e, $result));
+      }
+    }
+    return $result;
+  }
+
   function listing($options) {
     $result = new \artnum\JStore\Result();
     $c = $this->DB->readable();
