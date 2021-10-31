@@ -307,11 +307,13 @@ class SQL extends \artnum\JStore\OP {
   }
 
   function isUnary ($op) {
+    if (!is_string($op)) { return false; }
     switch ($op) {
       case '--':
       case '-': 
       case '**':
       case '*': return true;
+      default: return false;
     }
     return false;
   }
