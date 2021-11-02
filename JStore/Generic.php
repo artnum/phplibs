@@ -26,8 +26,6 @@
  */
 Namespace artnum\JStore;
 
-define('RID_CACHE_SECONDS', 900);
-
 class Generic { 
   public $db;
   public $request;
@@ -43,7 +41,6 @@ class Generic {
     $this->_tstart = microtime(true);
     $this->lockManager = null;
     $this->data = [];
-    $this->ridCache = null;
 
     if (!empty($options['postprocess']) && is_array($options['postprocess'])) {
       foreach ($options['postprocess'] as $fn) {
@@ -53,10 +50,6 @@ class Generic {
       }
     }
 
-    if (!empty($options['ridCache'])) {
-      $this->ridCache = $options['ridCache'];
-    }
-    
     if(is_null($http_request)) {
       try {
         $this->request = new \artnum\HTTP\JsonRequest();
@@ -180,19 +173,7 @@ class Generic {
 
   function run($conf = null) {
     header('Content-Type: application/json');
-    if ($this->ridCache) {
-      $rid = $this->request->getId();
-      if (!empty($rid)) {
-        if ($this->ridCache->get($rid) === 1) {
-          error_log('Duplicate request with id : ' . $this->request->getId());
-          $this->fail('Duplicate requête', 304);
-          return 0;
-        }
-      
-        $this->ridCache->set($rid, RID_CACHE_SECONDS);
-      }
-    }
-
+  
     if (substr($this->request->getCollection(), 0, 1) == '.') {
       $ret = $this->internal();
       return $ret;
