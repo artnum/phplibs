@@ -48,7 +48,7 @@ class SQL extends \artnum\JStore\OP {
   function __construct($db, $table, $id_name, $config) {
     parent::__construct($config);
     $this->DB = array();
-      $this->RODB = array();
+    $this->RODB = array();
     $this->RRobin = 0;
     $this->WRRobin = 0;
     if (!is_null($db)) {
@@ -56,8 +56,9 @@ class SQL extends \artnum\JStore\OP {
       $this->DB[0] = $db;
     }
     $this->Config = $config;
+    $this->cache = $this->kconf->getVar('cache');
     $this->conf('Table', $table);
-      $this->conf('IDName', $id_name);
+    $this->conf('IDName', $id_name);
     $this->DataLayer = new Data();
   }
 
@@ -153,6 +154,9 @@ class SQL extends \artnum\JStore\OP {
         $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
         $st->bindParam(':id', $id, $bind_type);
         $result->addItem([$id => $st->execute()]);
+        if ($this->cache) {
+          $this->cache->delete($this->Table . ':' . $id);
+        }
       } catch (\Exception $e) {
         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
         $result->addItem([$id => false]);
@@ -173,6 +177,9 @@ class SQL extends \artnum\JStore\OP {
       }
       try {
         $result->addItem([$id => $this->update($data) == true]);
+        if ($this->cache) {
+          $this->cache->delete($this->Table . ':' . $id);
+        }
       } catch (\Exception $e) {
         $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
         $result->addItem([$id => false]);
@@ -747,6 +754,14 @@ class SQL extends \artnum\JStore\OP {
 
   function _read($id) {
     $result = new \artnum\JStore\Result();
+    if ($this->cache) {
+      $cached = $this->cache->get($this->Table . ':' . $id);
+  
+      if ($cached) {
+        $result->addItem(unserialize($cached));
+        return $result;
+      }
+    }
     $results = $this->listing(array('search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)));
 
     if (is_array($results)) {
@@ -763,11 +778,18 @@ class SQL extends \artnum\JStore\OP {
         $result->addItem($results->getItems()[0]);
       }
     }
-
+    if ($this->cache) {
+      $this->cache->set($this->Table . ':' . $id, serialize($result->getItem(0)));
+    }
     return $result;
   }
 
   function _exists($id) {
+    if ($this->cache) {
+      if ($this->cache->set($this->Table . ':' . $id)) { 
+        return true;
+      }
+    }
     try {
       $st = $this->get_db(true)->prepare($this->req('exists'));
       $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
@@ -952,6 +974,10 @@ class SQL extends \artnum\JStore\OP {
       $result->addItem(['id' => $this->update($prefixed)]);
     }
 
+    if ($this->cache) {
+      $this->cache->delete($this->Table . ':' . $id);
+    }
+  
     return $result;
   }
 
