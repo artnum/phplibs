@@ -127,9 +127,9 @@ class JRestClient {
       \curl_setopt($this->ch, \CURLOPT_CUSTOMREQUEST, 'PUT');
       \curl_setopt($this->ch, \CURLOPT_POSTFIELDS, $jdata);
       $this->queryHeaders = [
-               'Content-Type: application/json',
-               'Content-Length: ' . \strlen($jdata),
-               'Content-MD5: ' . \md5($jdata)
+               'Content-Type' => 'application/json',
+               'Content-Length' => \strlen($jdata),
+               'Content-MD5' => \md5($jdata)
             ];
       return $this->exec();
    }
@@ -142,10 +142,10 @@ class JRestClient {
       \curl_setopt($this->ch, \CURLOPT_POST, TRUE);
       \curl_setopt($this->ch, \CURLOPT_POSTFIELDS, $jdata);
       $this->queryHeaders = [
-               'Content-Type: application/json',
-               'Content-Length: ' . \strlen($jdata),
-               'Content-MD5: ' . \md5($jdata)
-            ];
+            'Content-Type' => 'application/json',
+            'Content-Length' => \strlen($jdata),
+            'Content-MD5' => \md5($jdata)
+         ];
       return $this->exec();
    }
 
@@ -157,9 +157,9 @@ class JRestClient {
       \curl_setopt($this->ch, \CURLOPT_CUSTOMREQUEST, 'PATCH');
       \curl_setopt($this->ch, \CURLOPT_POSTFIELDS, $jdata);
       $this->queryHeaders = [
-               'Content-Type: application/json',
-               'Content-Length: ' . \strlen($jdata),
-               'Content-MD5: ' . \md5($jdata)
+               'Content-Type' => 'application/json',
+               'Content-Length' => \strlen($jdata),
+               'Content-MD5' => \md5($jdata)
             ];
       return $this->exec();
    }
