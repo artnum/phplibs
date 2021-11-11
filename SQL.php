@@ -56,7 +56,10 @@ class SQL extends \artnum\JStore\OP {
       $this->DB[0] = $db;
     }
     $this->Config = $config;
-    $this->cache = $this->kconf->getVar('cache');
+    $this->cache = null;
+    if (isset($this->kconf->getVar) && is_callable($this->kconf->getVar)) {
+      $this->cache = $this->kconf->getVar('cache');
+    }
     $this->conf('Table', $table);
     $this->conf('IDName', $id_name);
     $this->DataLayer = new Data();
@@ -66,7 +69,7 @@ class SQL extends \artnum\JStore\OP {
     if (is_null($db)) { return; }
     try {
       $attr = $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
       error_log('Not pdo object');
       return;
     }
@@ -83,7 +86,7 @@ class SQL extends \artnum\JStore\OP {
     if (is_null($db)) { return; }
     try {
       $attr = $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
       error_log('Not pdo object');
       return;
     }
