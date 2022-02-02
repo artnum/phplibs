@@ -165,31 +165,44 @@ class HTTP extends \artnum\HTTP\CORS
       'result' => new Result());
     if ($req->onItem()) {
       $item = $req->getItem();
-      if ($item === '.search') {
-        $ret = $this->Model->search($req->getParameters());
-        if ($ret) {
-          $retVal['success'] = true;
-          if (is_array($ret)) {
-            $retVal['result']->setItems($ret[0]);
-            $retVal['result']->setCount($ret[1]);
-          } else {
-            $retVal['result'] = $ret;
+      switch($item) {
+        case '.search':
+          $ret = $this->Model->search($req->getParameters());
+          if ($ret) {
+            $retVal['success'] = true;
+            if (is_array($ret)) {
+              $retVal['result']->setItems($ret[0]);
+              $retVal['result']->setCount($ret[1]);
+            } else {
+              $retVal['result'] = $ret;
+            }
           }
-        }
-        return $retVal;
-      }
-      if ($item === '_query') {
-        if (!is_callable([$this->Model, 'query'])) { 
-          $retVal['result']->addError('No available');
           return $retVal;
-        }
+        case '_query': 
+          if (!is_callable([$this->Model, 'query'])) { 
+            $retVal['result']->addError('No available');
+            return $retVal;
+          }
 
-        $res = $this->Model->search($req->getBody(), $req->getParameters());
-        if ($res) {
-          $retVal['success'] = true;
-          $retVal['result'] = $res;
-        }
-        return $retVal;
+          $res = $this->Model->search($req->getBody(), $req->getParameters());
+          if ($res) {
+            $retVal['success'] = true;
+            $retVal['result'] = $res;
+          }
+          return $retVal;
+        default: 
+          if (substr($item, 0, 1) === '.') {
+            $method = 'get' . ucfirst(strtolower(substr($item, 1)));
+            if (method_exists($this->Model, $method)) {
+              $results = $this->Model->$method($req->getParameters());
+            }
+            if ($results) {
+              $retVal['success'] = true;
+              $retVal['result'] = $results;
+            }
+            return $retVal;
+          }
+          break;
       }
     }
 
