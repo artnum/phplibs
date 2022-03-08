@@ -335,7 +335,8 @@ class SQL extends \artnum\JStore\OP {
     $relation = ' AND ';
     foreach ($body as $key => $value) {
       if (substr($key, 0, 1) === '#') {
-        switch (strtolower($key)) {
+        $effectiveKey = explode(':', $key)[0];
+        switch (strtolower($effectiveKey)) {
           case '#or':
             $relation = ' OR ';
             break;

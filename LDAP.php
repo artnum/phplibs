@@ -165,7 +165,8 @@ class LDAP extends \artnum\JStore\OP {
     $relation = ' AND ';
     foreach ($body as $key => $value) {
       if (substr($key, 0, 1) === '#') {
-        switch (strtolower($key)) {
+        $effectiveKey = explode(':', $key)[0];
+        switch (strtolower($effectiveKey)) {
           case '#or':
             $relation = '|';
             break;
@@ -174,7 +175,7 @@ class LDAP extends \artnum\JStore\OP {
             break;
         }
         
-        $predicats[] = '(' . $relation . '(' . $this->query($value, $params, $count) . '))';
+        $predicats[] = '(' . $relation . $this->query($value, $params, $count) . ')';
       } else {
         if (!is_array($value)) {
           if ($this->isUnary($value)) {
@@ -204,7 +205,7 @@ class LDAP extends \artnum\JStore\OP {
         }
         $novalue = false;
         $predicat = '';
-
+        $anyDirection = 0;
         $effectiveKey = explode(':', $key)[0];
         $valuePlaceHolder = ':params' . $count;
         switch ($value[0]) {
@@ -213,7 +214,13 @@ class LDAP extends \artnum\JStore\OP {
           case '>':
           case '<':
           case '=': $predicat = $effectiveKey . $value[0] . $valuePlaceHolder;  break;
-          case '~': $predicat = $effectiveKey . '=~' . $valuePlaceHolder;; break;
+          case '~': $predicat = $effectiveKey . '=~' . $valuePlaceHolder; break;
+          case '~~': $predicat = $effectiveKey . '=' . $valuePlaceHolder; $anyDirection = 3; break;
+          case '>~': $predicat = $effectiveKey . '=' . $valuePlaceHolder; $anyDirection = 1; break;
+          case '<~':  $predicat = $effectiveKey . '=' . $valuePlaceHolder; $anyDirection = 2; break;
+          case '!~~': $predicat = '!(' . $effectiveKey . '=' . $valuePlaceHolder . ')'; $anyDirection = 3; break;
+          case '!>~': $predicat = '!(' . $effectiveKey . '=' . $valuePlaceHolder . ')'; $anyDirection = 1; break;
+          case '!<~':  $predicat = '!(' .$effectiveKey . '=' . $valuePlaceHolder . ')'; $anyDirection = 2; break;
           case '!=' : $predicat = '!(' . $effectiveKey . '=' . $valuePlaceHolder . ')'; break;
           case '--':
           case '-': 
@@ -228,7 +235,15 @@ class LDAP extends \artnum\JStore\OP {
             case 'int':
               $v = intval($value[1]);
               break;
-            }
+            default:
+              switch($anyDirection) {
+                default: break;
+                case 3: $v = '[[ANY]]' . $v . '[[ANY]]'; break;
+                case 2: $v = '[[ANY]]' . $v; break;
+                case 1: $v = $v . '[[ANY]]'; break;
+              }
+              break;
+          }
           $params[':params' . $count] = [$v, $type];
           $count++;
         }
@@ -396,7 +411,7 @@ class LDAP extends \artnum\JStore\OP {
     }
     return $entry;
   }
-  
+
   function search($body, $options) {
     $result = new \artnum\JStore\Result();
     $c = $this->DB->readable();
@@ -413,6 +428,7 @@ class LDAP extends \artnum\JStore\OP {
     foreach ($params as $k => $v) {
       $filter = str_replace($k, ldap_escape($v[0], '', LDAP_ESCAPE_FILTER), $filter);
     }
+    $filter = str_replace('[[ANY]]', '*', $filter);
 
     $res = @ldap_list($c, $this->_dn(), $filter, $this->Attribute ?? [ '*' ], 0, $limit);
     if($res) {
