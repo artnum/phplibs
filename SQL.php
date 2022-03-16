@@ -343,8 +343,6 @@ class SQL extends \artnum\JStore\OP {
           case '#and':
             $relation = ' AND ';
             break;
-          case '#xor':
-            $relation = ' XOR ';
         }
         
         $predicats[] = '( ' . $this->query($value, $params, $count) . ' )';
@@ -406,6 +404,10 @@ class SQL extends \artnum\JStore\OP {
           case '*': $operator = 'IS NOT NULL'; $novalue = true; break;
         }
 
+        if ($type === 'str' && isset($value[1]) && strpos($value[1], '*') !== false) {
+          $operator = ' LIKE ';
+        }
+
         $table = $this->conf('Table');
         $attr = $effectiveKey;
         if (strpos($effectiveKey, '_')) {
@@ -428,6 +430,9 @@ class SQL extends \artnum\JStore\OP {
               break;
             case 'null':
               $v = null;
+              break;
+            default: 
+              $v = str_replace('*', '%', $v);
               break;
           }
           $params[':params' . $count] = [$v, $type];
