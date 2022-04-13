@@ -328,7 +328,7 @@ class SQL extends \artnum\JStore\OP {
     return false;
   }
 
-  function query ($body, &$params, &$count) {
+  function query ($body, &$params, &$count, $up_relation = null) {
     if ($params === null) { $params = []; }
     if ($count === null) { $count = 0; }
     $predicats = [];
@@ -345,7 +345,7 @@ class SQL extends \artnum\JStore\OP {
             break;
         }
         
-        $predicats[] = '( ' . $this->query($value, $params, $count) . ' )';
+        $predicats[] = '( ' . $this->query($value, $params, $count, $relation) . ' )';
       } else {
         if (!is_array($value)) {
           if ($this->isUnary($value)) {
@@ -440,6 +440,9 @@ class SQL extends \artnum\JStore\OP {
         }
         $predicats[] = $predicat;
       }
+    }
+    if ($up_relation) {
+      $relation = $up_relation;
     }
     return join($relation, $predicats);
   }
@@ -692,7 +695,7 @@ class SQL extends \artnum\JStore\OP {
     $params = [];
     $count = 0;
 
-    $statement .= ' WHERE ' . $this->query($body, $params, $count);    
+    $statement .= ' WHERE ' . $this->query($body, $params, $count);
     if(! empty($options['sort'])) {
       $statement .= ' ' . $this->prepareSort($options['sort']);
     }
