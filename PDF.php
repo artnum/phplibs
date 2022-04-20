@@ -1046,6 +1046,14 @@ class PDF extends \tFPDF {
     }
   }
 
+  function getPageBottom () {
+    return $this->h - $this->bMargin;
+  }
+
+  function setBottomMargin ($margin) {
+    $this->bMargin = $margin;
+  }
+
    /* fix httpencode for some case where user agent is not set */
    protected function _httpencode($param, $value, $isUTF8)
    {
