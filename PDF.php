@@ -271,7 +271,15 @@ class PDF extends \tFPDF {
       }
 
       $dheight = $this->getLineHeight() - $this->getFontSize();
-      $this->blocks[$name] = array('origin' => $this->GetY(), 'closed' => false, 'max-y' => $this->GetY(), 'left' => $this->left, 'right' => $this->right, 'delta-height' => $dheight);
+      $this->blocks[$name] = array(
+        'origin' => $this->GetY(),
+        'closed' => false,
+        'max-y' => $this->GetY(),
+        'left' => $this->left,
+        'right' => $this->right,
+        'delta-height' => $dheight,
+        'buffer' => ''
+      );
     }
     $this->current_block = $name;
     $this->SetX($this->left);
@@ -337,6 +345,8 @@ class PDF extends \tFPDF {
         $block['closed'] = true;
         $y = $block['max-y'];
         $this->_draw_block_bg($block);
+        $this->buffer .= $block['buffer'];
+
       }
       $this->current_block = null;
     }
@@ -403,7 +413,11 @@ class PDF extends \tFPDF {
         $this->layers[$this->current_layer]['data'][$this->page] = $s ."\n";
       }
     } else {
-      $this->buffer .= $s . "\n";
+      if ($this->current_block && isset($this->blocks[$this->current_block])) {
+        $this->blocks[$this->current_block]['buffer'] .= $s ."\n";
+      } else {
+        $this->buffer .= $s . "\n";
+      }
     }
   }
 
