@@ -47,6 +47,7 @@ class PDF extends \tFPDF {
   protected $current_block = null;
   protected $margin = array('left' => null, 'right' => null, 'top' => null);
   protected $blank = 0;
+  private $page_is_added = false;
   public $coverPage = 0;
 
   function __construct() {
@@ -139,6 +140,7 @@ class PDF extends \tFPDF {
   
   function AddPage($orientation = '', $size = '', $rotation = 0) {
     /* extension */
+    $this->page_is_added = true;
     $this->_flushblock();
 
     /* direct copy of original AddPage */
@@ -220,6 +222,8 @@ class PDF extends \tFPDF {
     /* extension */
     $this->SetXY($this->lMargin, $this->tMargin);
     $this->_reinitblock();
+    $this->page_is_added = false;
+
   }
 
   function AddBlankPage ($orientation = '', $size = '') {
@@ -285,6 +289,11 @@ class PDF extends \tFPDF {
     $this->SetX($this->left);
   }
 
+  function Output($dest='', $name='', $isUTF8=false) {
+    $this->close_block();
+    return parent::Output($dest, $name, $isUTF8);
+  }
+
   protected function _flushblock() {
     if ($this->current_block && isset($this->blocks[$this->current_block])) {
       $this->blocks[$this->current_block]['max-y'] = $this->GetY();
@@ -346,6 +355,7 @@ class PDF extends \tFPDF {
         $y = $block['max-y'];
         $this->_draw_block_bg($block);
         $this->buffer .= $block['buffer'];
+        $block['buffer'] = '';
 
       }
       $this->current_block = null;
@@ -413,11 +423,19 @@ class PDF extends \tFPDF {
         $this->layers[$this->current_layer]['data'][$this->page] = $s ."\n";
       }
     } else {
-      if ($this->current_block && isset($this->blocks[$this->current_block])) {
+      if (!$this->page_is_added && $this->current_block && isset($this->blocks[$this->current_block])) {
         $this->blocks[$this->current_block]['buffer'] .= $s ."\n";
       } else {
         $this->buffer .= $s . "\n";
       }
+    }
+  }
+
+  function _put ($s) {
+    if (!$this->page_is_added && $this->current_block && isset($this->blocks[$this->current_block])) {
+      $this->blocks[$this->current_block]['buffer'] .= $s ."\n";
+    } else {
+      $this->buffer .= $s . "\n";
     }
   }
 
