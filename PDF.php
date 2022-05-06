@@ -540,12 +540,12 @@ class PDF extends \tFPDF {
 
   function addTaggedFont($tag, $family, $style = '', $file = '', $uni = false) {
     $this->AddFont($family, $style, $file, $uni);
-    $this->tagged_fonts[$tag] = $family;
+    $this->tagged_fonts[$tag] = [$family, $style];
   }
 
   function setTaggedFont($tag) {
     if(isset($this->tagged_fonts[$tag])) {
-      $this->SetFont($this->tagged_fonts[$tag]);
+      $this->SetFont($this->tagged_fonts[$tag][0],$this->tagged_fonts[$tag][1]);
     }
   }
 
