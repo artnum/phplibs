@@ -780,47 +780,110 @@ class PDF extends \tFPDF {
     }
   }
 
-  function setColor($hex, $what = 'text') {
-    switch($hex) {
+  function getRGB($color)
+  {
+    switch ($color) {
         /* CSS Level 1 */
-      case 'black':     $hex = '000'; break;
-      case 'silver':    $hex = 'c0c0c0'; break;
-      case 'gray':      $hex = '808080'; break;
-      case 'white':     $hex = 'fff'; break;
-      case 'maroon':    $hex = '800000'; break;
-      case 'red':       $hex = 'ff0000'; break;
-      case 'purple':    $hex = '800080'; break;
-      case 'fuchsia':   $hex = 'ff00ff'; break;
-      case 'green':     $hex = '008000'; break;
-      case 'lime':      $hex = '00ff00'; break;
-      case 'olive':     $hex = '808000'; break;
-      case 'yellow':    $hex = 'ffff00'; break;
-      case 'navy':      $hex = '000080'; break;
-      case 'blue':      $hex = '0000ff'; break;
-      case 'teal':      $hex = '008080'; break;
-      case 'aqua':      $hex = '00ffff'; break;
+      case 'black':
+        $color = '#000';
+        break;
+      case 'silver':
+        $color = '#c0c0c0';
+        break;
+      case 'gray':
+        $color = '#808080';
+        break;
+      case 'white':
+        $color = '#fff';
+        break;
+      case 'maroon':
+        $color = '#800000';
+        break;
+      case 'red':
+        $color = '#ff0000';
+        break;
+      case 'purple':
+        $color = '#800080';
+        break;
+      case 'fuchsia':
+        $color = '#ff00ff';
+        break;
+      case 'green':
+        $color = '#008000';
+        break;
+      case 'lime':
+        $color = '#00ff00';
+        break;
+      case 'olive':
+        $color = '#808000';
+        break;
+      case 'yellow':
+        $color = '#ffff00';
+        break;
+      case 'navy':
+        $color = '#000080';
+        break;
+      case 'blue':
+        $color = '#0000ff';
+        break;
+      case 'teal':
+        $color = '#008080';
+        break;
+      case 'aqua':
+        $color = '#00ffff';
+        break;
     }
 
-    $r = 0; $g = 0; $b = 0;
-    if($hex[0] == '#') {
-      $hex = substr($hex, 1);
+    $r = 0;
+    $g = 0;
+    $b = 0;
+    if ($color[0] === '#') {
+      $color = substr($color, 1);
+      $h1 = '';
+      $h2 = '';
+      $h3 = '';
+      if (strlen($color) == 3) {
+        $h1 = $color[0] . $color[0];
+        $h2 = $color[1] . $color[1];
+        $h3 = $color[2] . $color[2];
+      } else {
+        $h1 = substr($color, 0, 2) ? substr($color, 0, 2) : 'ff';
+        $h2 = substr($color, 2, 2) ? substr($color, 2, 2) : 'ff';
+        $h3 = substr($color, 4, 2) ? substr($color, 4, 2) : 'ff';
+      }
+
+      $r = hexdec($h1);
+      $g = hexdec($h2);
+      $b = hexdec($h3);
     }
 
-    $h1 = ''; $h2 = ''; $h3 = '';
-    if(strlen($hex) == 3) {
-      $h1 = $hex[0] . $hex[0];
-      $h2 = $hex[1] . $hex[1];
-      $h3 = $hex[2] . $hex[2];
-    } else {
-      $h1 = substr($hex, 0, 2) ? substr($hex, 0, 2) : 'ff';
-      $h2 = substr($hex, 2, 2) ? substr($hex, 2, 2) : 'ff';
-      $h3 = substr($hex, 4, 2) ? substr($hex, 4, 2) : 'ff';
+    return [$r, $g, $b];
+  }
+
+  function getReverseColor ($color) { 
+    list ($r, $g, $b) = $this->getRGB($color);
+    $r = 255 - $r;
+    $g = 255 - $g;
+    $b = 255 - $b;
+    
+    return '#' . str_pad(dechex($r), 2, '0', STR_PAD_LEFT) . str_pad(dechex($g), 2, '0', STR_PAD_LEFT) . str_pad(dechex($b), 2, '0', STR_PAD_LEFT);
+  }
+
+
+  function getBWFromColor ($color) { 
+    list ($r, $g, $b) = $this->getRGB($color);
+    $r = pow($r / 255, 2.2);
+    $g = pow($g / 255, 2.2);
+    $b = pow($b / 255, 2.2);
+    
+    if ((0.2126 * $r + 0.7151 * $g + 0.0721 * $b) < 0.5) {
+      return 'white';
     }
+    return 'black';
+  }
 
-    $r = hexdec($h1);
-    $g = hexdec($h2);
-    $b = hexdec($h3);
-
+  function setColor($color, $what = 'text') {
+    list ($r, $g, $b) = $this->getRGB($color);
     switch(strtolower($what)) {
       case 'text' : default: $this->SetTextColor($r, $g, $b); break;
       case 'draw': $this->SetDrawColor($r, $g, $b); break;
