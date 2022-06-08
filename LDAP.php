@@ -384,7 +384,8 @@ class LDAP extends \artnum\JStore\OP {
         $filter = '(objectclass=*)';
       }
     }
-    return $filter;
+
+    return str_replace('**', '*', $filter);
   }
 
   function processEntry ($conn, $ldapEntry, &$result) {
