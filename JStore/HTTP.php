@@ -35,6 +35,7 @@ class HTTP extends \artnum\HTTP\CORS
   }
 
   function headAction($req) {
+    $this->setCorsHeaders();
     try {
       if($req->onCollection()) {
         return array(
@@ -55,6 +56,7 @@ class HTTP extends \artnum\HTTP\CORS
   }
 
   function getAction($req) {
+    $this->setCorsHeaders();
     $retVal = array(
       'success' => false,
       'result' => new Result(),
@@ -125,6 +127,7 @@ class HTTP extends \artnum\HTTP\CORS
   }
 
   function patchAction ($req) {
+    $this->setCorsHeaders();
     $retVal = array(
       'success' => false,
       'result' => new Result(),
@@ -152,6 +155,7 @@ class HTTP extends \artnum\HTTP\CORS
   }
 
   function putAction($req) {
+    $this->setCorsHeaders();
     if(!$req->onCollection()) {
       return $this->postAction($req);
     }
@@ -159,6 +163,7 @@ class HTTP extends \artnum\HTTP\CORS
   }
 
   function postAction($req) {
+    $this->setCorsHeaders();
     $retVal = array(
       'success' => false,
       'msg' => 'Generic error',
@@ -227,6 +232,7 @@ class HTTP extends \artnum\HTTP\CORS
   }
   
   function deleteAction($req) {
+    $this->setCorsHeaders();
     $retVal = array(
       'success' => false,
       'msg' => 'No element selected',
