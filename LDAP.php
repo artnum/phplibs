@@ -158,6 +158,16 @@ class LDAP extends \artnum\JStore\OP {
     return false;
   }
 
+  function startsWith ($h, $n) {
+    if (function_exists('str_starts_with')) { return str_starts_with($h, $n); }
+    return (string)$n !== '' && strncmp($h, $n, strlen($n)) === 0;
+  }
+
+  function endsWith ($h, $n) {
+    if (function_exists('str_ends_width')) { return str_ends_with($h, $n); }
+    return (string)$n !== '' && substr($h, -strlen($n)) === (string)$n;
+  }
+
   function query ($body, &$params, &$count) {
     if ($params === null) { $params = []; }
     if ($count === null) { $count = 0; }
@@ -236,11 +246,28 @@ class LDAP extends \artnum\JStore\OP {
               $v = intval($value[1]);
               break;
             default:
+              $v = str_replace(['*', '%'], ['[[ANY]]', '[[ANY]]'], $v);
               switch($anyDirection) {
                 default: break;
-                case 3: $v = '[[ANY]]' . $v . '[[ANY]]'; break;
-                case 2: $v = '[[ANY]]' . $v; break;
-                case 1: $v = $v . '[[ANY]]'; break;
+                case 3: 
+                  if (!$this->startsWith($v, '[[ANY]]') && !$this->endsWith($v, '[[ANY]]')) {
+                    $v = '[[ANY]]' . $v . '[[ANY]]';
+                  } else if ($this->startsWith($v, '[[ANY]]') && !$this->endsWith($v, '[[ANY]]')) {
+                    $v = $v . '[[ANY]]';
+                  } else if (!$this->startsWith($v, '[[ANY]]') && $this->endsWith($v, '[[ANY]]')) {
+                    $v = '[[ANY]]' . $v;
+                  }
+                  break;
+                case 2: 
+                  if (!$this->startsWith($v, '[[ANY]]')) {
+                    $v = '[[ANY]]' . $v;
+                  }
+                  break;
+                case 1: 
+                  if (!$this->endsWith($v, '[[ANY]]')) {
+                    $v = $v . '[[ANY]]';
+                  }
+                  break;
               }
               break;
           }
