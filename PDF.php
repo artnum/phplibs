@@ -289,6 +289,14 @@ class PDF extends \tFPDF {
     $this->SetX($this->left);
   }
 
+  function get_block_origin () {
+    if ($this->current_block && isset($this->blocks[$this->current_block])) {
+      $block = $this->blocks[$this->current_block];
+      return $block['origin'] - $block['delta-height'];
+    }
+    return 0;
+  }
+
   function Output($dest='', $name='', $isUTF8=false) {
     $this->close_block();
     return parent::Output($dest, $name, $isUTF8);
@@ -948,7 +956,7 @@ class PDF extends \tFPDF {
           }
           break;
         case 'dotted':
-          $this->drawLine($x1, $y1, $length, $angle, 'dashed', array_merge(array( 
+          $this->drawLine($x1, $y1, $length, -$angle, 'dashed', array_merge(array( 
             'dash-size'=> 0.1, 'dash-space'=> 0.1
           ), $options));
           break;
@@ -1132,6 +1140,26 @@ class PDF extends \tFPDF {
       } else {
          return $param."*=UTF-8''".rawurlencode($value);
       }
+   }
+
+   function getTextHeight ($text, $width = 0) {
+    if ($width === 0) { $width = $this->w; }
+    $lines = explode("\n", $text);
+    $strHeight = 0;
+    $lineWidth = 0;
+    foreach ($lines as $line) {
+      $words = explode(' ', $line);
+      foreach($words as $word) {
+        $wWidth = $this->GetStringWidth($word . ' ');
+        if ($lineWidth + $wWidth > $width) {
+          $strHeight++;
+          $lineWidth = 0;
+        }
+        $lineWidth += $wWidth;
+      }
+    }
+
+    return $this->getLineHeight() * $strHeight;
    }
 }
 
