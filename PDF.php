@@ -50,8 +50,21 @@ class PDF extends \tFPDF {
   private $page_is_added = false;
   public $coverPage = 0;
 
-  function __construct() {
-    parent::__construct();
+  function __construct($orientation='P', $unit='mm', $size='A4') {
+    if (is_array($orientation)) {
+      $params = $orientation;
+      $orientation = 'P';
+      $unit = 'mm';
+      $size = 'A4';
+      foreach($params as $k => $v) {
+        if ($k === 'orientation') { $orientation = $v; }
+        if ($k === 'unit') { $unit = $v; }
+        if ($k === 'size') { $size = $v; }
+
+      }
+    }
+    
+    parent::__construct($orientation, $unit, $size);
     $this->add_layer('_origin');
     $this->current_layer = '_origin';
     $this->last_font_size = $this->FontSize;
@@ -840,6 +853,139 @@ class PDF extends \tFPDF {
       case 'aqua':
         $color = '#00ffff';
         break;
+      /* css level 2, 3 and 4 */
+      case 'orange': $color = '#ffa500'; break;
+      case 'aliceblue': $color = '#f0f8ff'; break;
+      case 'antiquewhite': $color = '#faebd7'; break;
+      case 'aquamarine': $color = '#7fffd4'; break;
+      case 'azure': $color = '#f0ffff'; break;
+      case 'beige': $color = '#f5f5dc'; break;
+      case 'bisque': $color = '#ffe4c4'; break;
+      case 'blanchedalmond': $color = '#ffebcd'; break;
+      case 'blueviolet': $color = '#8a2be2'; break;
+      case 'brown': $color = '#a52a2a'; break;
+      case 'burlywood': $color = '#deb887'; break;
+      case 'cadetblue': $color = '#5f9ea0'; break;
+      case 'chartreuse': $color = '#7fff00'; break;
+      case 'chocolate': $color = '#d2691e'; break;
+      case 'coral': $color = '#ff7f50'; break;
+      case 'cornflowerblue': $color = '#6495ed'; break;
+      case 'cornsilk': $color = '#fff8dc'; break;
+      case 'crimson': $color = '#dc143c'; break;
+      case 'cyan': $color = '#00ffff'; break;
+      case 'darkblue': $color = '#00008b'; break;
+      case 'darkcyan': $color = '#008b8b'; break;
+      case 'darkgoldenrod': $color = '#b8860b'; break;
+      case 'darkgray': $color = '#a9a9a9'; break;
+      case 'darkgreen': $color = '#006400'; break;
+      case 'darkgrey': $color = '#a9a9a9'; break;
+      case 'darkkhaki': $color = '#bdb76b'; break;
+      case 'darkmagenta': $color = '#8b008b'; break;
+      case 'darkolivegreen': $color = '#556b2f'; break;
+      case 'darkorange': $color = '#ff8c00'; break;
+      case 'darkorchid': $color = '#9932cc'; break;
+      case 'darkred': $color = '#8b0000'; break;
+      case 'darksalmon': $color = '#e9967a'; break;
+      case 'darkseagreen': $color = '#8fbc8f'; break;
+      case 'darkslateblue': $color = '#483d8b'; break;
+      case 'darkslategray': $color = '#2f4f4f'; break;
+      case 'darkslategrey': $color = '#2f4f4f'; break;
+      case 'darkturquoise': $color = '#00ced1'; break;
+      case 'darkviolet': $color = '#9400d3'; break;
+      case 'deeppink': $color = '#ff1493'; break;
+      case 'deepskyblue': $color = '#00bfff'; break;
+      case 'dimgray': $color = '#696969'; break;
+      case 'dimgrey': $color = '#696969'; break;
+      case 'dodgerblue': $color = '#1e90ff'; break;
+      case 'firebrick': $color = '#b22222'; break;
+      case 'floralwhite': $color = '#fffaf0'; break;
+      case 'forestgreen': $color = '#228b22'; break;
+      case 'gainsboro': $color = '#dcdcdc'; break;
+      case 'ghostwhite': $color = '#f8f8ff'; break;
+      case 'gold': $color = '#ffd700'; break;
+      case 'goldenrod': $color = '#daa520'; break;
+      case 'greenyellow': $color = '#adff2f'; break;
+      case 'grey': $color = '#808080'; break;
+      case 'honeydew': $color = '#f0fff0'; break;
+      case 'hotpink': $color = '#ff69b4'; break;
+      case 'indianred': $color = '#cd5c5c'; break;
+      case 'indigo': $color = '#4b0082'; break;
+      case 'ivory': $color = '#fffff0'; break;
+      case 'khaki': $color = '#f0e68c'; break;
+      case 'lavender': $color = '#e6e6fa'; break;
+      case 'lavenderblush': $color = '#fff0f5'; break;
+      case 'lawngreen': $color = '#7cfc00'; break;
+      case 'lemonchiffon': $color = '#fffacd'; break;
+      case 'lightblue': $color = '#add8e6'; break;
+      case 'lightcoral': $color = '#f08080'; break;
+      case 'lightcyan': $color = '#e0ffff'; break;
+      case 'lightgoldenrodyellow': $color = '#fafad2'; break;
+      case 'lightgray': $color = '#d3d3d3'; break;
+      case 'lightgreen': $color = '#90ee90'; break;
+      case 'lightgrey': $color = '#d3d3d3'; break;
+      case 'lightpink': $color = '#ffb6c1'; break;
+      case 'lightsalmon': $color = '#ffa07a'; break;
+      case 'lightseagreen': $color = '#20b2aa'; break;
+      case 'lightskyblue': $color = '#87cefa'; break;
+      case 'lightslategray': $color = '#778899'; break;
+      case 'lightslategrey': $color = '#778899'; break;
+      case 'lightsteelblue': $color = '#b0c4de'; break;
+      case 'lightyellow': $color = '#ffffe0'; break;
+      case 'limegreen': $color = '#32cd32'; break;
+      case 'linen': $color = '#faf0e6'; break;
+      case 'magenta': $color = '#ff00ff'; break;
+      case 'mediumaquamarine': $color = '#66cdaa'; break;
+      case 'mediumblue': $color = '#0000cd'; break;
+      case 'mediumorchid': $color = '#ba55d3'; break;
+      case 'mediumpurple': $color = '#9370db'; break;
+      case 'mediumseagreen': $color = '#3cb371'; break;
+      case 'mediumslateblue': $color = '#7b68ee'; break;
+      case 'mediumspringgreen': $color = '#00fa9a'; break;
+      case 'mediumturquoise': $color = '#48d1cc'; break;
+      case 'mediumvioletred': $color = '#c71585'; break;
+      case 'midnightblue': $color = '#191970'; break;
+      case 'mintcream': $color = '#f5fffa'; break;
+      case 'mistyrose': $color = '#ffe4e1'; break;
+      case 'moccasin': $color = '#ffe4b5'; break;
+      case 'navajowhite': $color = '#ffdead'; break;
+      case 'oldlace': $color = '#fdf5e6'; break;
+      case 'olivedrab': $color = '#6b8e23'; break;
+      case 'orangered': $color = '#ff4500'; break;
+      case 'orchid': $color = '#da70d6'; break;
+      case 'palegoldenrod': $color = '#eee8aa'; break;
+      case 'palegreen': $color = '#98fb98'; break;
+      case 'paleturquoise': $color = '#afeeee'; break;
+      case 'palevioletred': $color = '#db7093'; break;
+      case 'papayawhip': $color = '#ffefd5'; break;
+      case 'peachpuff': $color = '#ffdab9'; break;
+      case 'peru': $color = '#cd853f'; break;
+      case 'pink': $color = '#ffc0cb'; break;
+      case 'plum': $color = '#dda0dd'; break;
+      case 'powderblue': $color = '#b0e0e6'; break;
+      case 'rosybrown': $color = '#bc8f8f'; break;
+      case 'royalblue': $color = '#4169e1'; break;
+      case 'saddlebrown': $color = '#8b4513'; break;
+      case 'salmon': $color = '#fa8072'; break;
+      case 'sandybrown': $color = '#f4a460'; break;
+      case 'seagreen': $color = '#2e8b57'; break;
+      case 'seashell': $color = '#fff5ee'; break;
+      case 'sienna': $color = '#a0522d'; break;
+      case 'skyblue': $color = '#87ceeb'; break;
+      case 'slateblue': $color = '#6a5acd'; break;
+      case 'slategray': $color = '#708090'; break;
+      case 'slategrey': $color = '#708090'; break;
+      case 'snow': $color = '#fffafa'; break;
+      case 'springgreen': $color = '#00ff7f'; break;
+      case 'steelblue': $color = '#4682b4'; break;
+      case 'tan': $color = '#d2b48c'; break;
+      case 'thistle': $color = '#d8bfd8'; break;
+      case 'tomato': $color = '#ff6347'; break;
+      case 'turquoise': $color = '#40e0d0'; break;
+      case 'violet': $color = '#ee82ee'; break;
+      case 'wheat': $color = '#f5deb3'; break;
+      case 'whitesmoke': $color = '#f5f5f5'; break;
+      case 'yellowgreen': $color = '#9acd32'; break;
+      case 'rebeccapurple': $color = '#663399'; break;       
     }
 
     $r = 0;
@@ -914,6 +1060,7 @@ class PDF extends \tFPDF {
 
   function drawLine($x1, $y1, $length, $angle = 0, $type = 'line', $options = array()) {
     $prevDrawColor = $this->DrawColor;
+    $prevLineWidth = $this->LineWidth;
 
     if(isset($options['color'])) {
       $this->setColor($options['color'], 'draw');
@@ -926,7 +1073,11 @@ class PDF extends \tFPDF {
 
     $dashSpace = pow($dashSize, 1/3);
     if(isset($options['dash-space'])) {
-      $dashSapce = $options['dash-space'];
+      $dashSpace = $options['dash-space'];
+    }
+
+    if (isset($options['width'])) {
+      $this->SetLineWidth($options['width']);
     }
 
     /* We use angle of circle which start at 3 o'clock (0°) and goes
@@ -963,6 +1114,7 @@ class PDF extends \tFPDF {
       }
     }
     $this->DrawColor = $prevDrawColor;
+    $this->SetLineWidth($prevLineWidth);
     $this->_out($this->DrawColor);
   }
 
@@ -1035,6 +1187,45 @@ class PDF extends \tFPDF {
       $this->drawLine($lenX + $startX , $stopY + $squareSize, $height, 90);
       $this->drawLine($lenX + $startX, $stopY + $squareSize, $lenX, 180);
     }
+
+    /* Reset to previous state */
+    $this->SetLineWidth($prevLineWidth);
+    $this->DrawColor = $prevDrawColor;
+    $this->_out($this->DrawColor);
+  }
+
+
+  function frame($height, $options = array()) {
+    $prevLineWidth = $this->LineWidth;
+    $prevDrawColor = $this->DrawColor;
+
+    $maxLength = isset($options['length']) ? $options['length'] : ceil($this->w - ($this->right + $this->left));
+
+    if(isset($options['color'])) {
+      $this->setColor($options['color'], 'draw');
+    } else {
+      $this->setColor('black', 'draw');
+    }
+
+    $lineX = $startX = isset($options['x-origin']) ? $options['x-origin'] : $this->left;
+    $lineY = $startY = isset($options['y-origin']) ? $options['y-origin'] : $this->GetY();
+    $lenX = $maxLength;
+    if($lineX != $this->left && !isset($options['length'])) {
+      $lenX = $this->w - ($lineX + $this->right);
+    }
+
+    $width = 0.2;
+    if(isset($options['width'])) {
+      $width = floatval($options['width']);
+      $this->SetLineWidth($options['width']);
+    }
+
+    $width =  $width / 2;
+    $this->drawLine($startX, $startY, $lenX);
+    $this->drawLine($startX, $startY, $height - $width, -90);
+    $this->drawLine($startX, $startY + $height,  $lenX);
+    $this->drawLine($lenX + $startX, $startY, $height - $width, -90);
+  
 
     /* Reset to previous state */
     $this->SetLineWidth($prevLineWidth);
