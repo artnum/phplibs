@@ -217,7 +217,7 @@ class LDAP extends \artnum\JStore\OP {
         $predicat = '';
         $anyDirection = 0;
         $effectiveKey = explode(':', $key)[0];
-        $valuePlaceHolder = ':params' . $count;
+        $valuePlaceHolder = ':params' . str_pad($count, 4, '0', STR_PAD_LEFT);
         switch ($value[0]) {
           case '<=':
           case '>=':
@@ -271,7 +271,7 @@ class LDAP extends \artnum\JStore\OP {
               }
               break;
           }
-          $params[':params' . $count] = [$v, $type];
+          $params[':params' . str_pad($count, 4, '0', STR_PAD_LEFT)] = [$v, $type];
           $count++;
         }
         $predicats[] = '(' . $predicat . ')';
