@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2017-2019 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2017-2022 Etienne Bagnoud <etienne@artisan-numerique.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 Namespace artnum;
+
+use Exception;
 
 require('id.php');
 
@@ -56,10 +58,6 @@ class SQL extends \artnum\JStore\OP {
       $this->DB[0] = $db;
     }
     $this->Config = $config;
-    $this->cache = null;
-    if (isset($this->kconf->getVar) && is_callable($this->kconf->getVar)) {
-      $this->cache = $this->kconf->getVar('cache');
-    }
     $this->conf('Table', $table);
     $this->conf('IDName', $id_name);
     $this->DataLayer = new Data();
@@ -67,12 +65,7 @@ class SQL extends \artnum\JStore\OP {
 
   function add_db($db, $readonly = false) {
     if (is_null($db)) { return; }
-    try {
-      $attr = $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-    } catch (\Exception $e) {
-      error_log('Not pdo object');
-      return;
-    }
+    $attr = $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     if ($attr) {
       if (!$readonly) {
         $this->DB[] = $db;
@@ -84,12 +77,7 @@ class SQL extends \artnum\JStore\OP {
 
   function set_db($db) {
     if (is_null($db)) { return; }
-    try {
-      $attr = $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-    } catch (\Exception $e) {
-      error_log('Not pdo object');
-      return;
-    }
+    $attr = $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     if ($attr) {
       $this->DB[0] = $db;
     }
@@ -150,20 +138,14 @@ class SQL extends \artnum\JStore\OP {
   }
 
   function _delete($id) {
-    $result = new \artnum\JStore\Result();
+    $result = ['count' => 0, 'id' => $id];
     if (!$this->conf('delete')) {
-      try {
-        $st = $this->get_db(false)->prepare($this->req('delete'));
-        $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-        $st->bindParam(':id', $id, $bind_type);
-        $result->addItem([$id => $st->execute()]);
-        if ($this->cache) {
-          $this->cache->delete($this->Table . ':' . $id);
-        }
-      } catch (\Exception $e) {
-        $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-        $result->addItem([$id => false]);
-      }
+      $st = $this->get_db(false)->prepare($this->req('delete'));
+      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+      $st->bindParam(':id', $id, $bind_type);
+      $this->response->start_output();
+      $this->response->print([$id => $st->execute()]);
+      $result['count']++;
     } else {
       $data = array($this->IDName => $id);
       if (!$this->conf('delete.ts')) {
@@ -178,15 +160,9 @@ class SQL extends \artnum\JStore\OP {
           $data[$this->conf('mtime')] = time();
         }
       }
-      try {
-        $result->addItem([$id => $this->update($data) == true]);
-        if ($this->cache) {
-          $this->cache->delete($this->Table . ':' . $id);
-        }
-      } catch (\Exception $e) {
-        $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-        $result->addItem([$id => false]);
-      }
+      $this->response->start_output();
+      $this->response->print([$id => $this->update($data) == true]);
+      $result['count']++;
     }
     return $result;
   }
@@ -202,16 +178,10 @@ class SQL extends \artnum\JStore\OP {
   }
 
   function getLastId($params) {
-    try {
-      $st = $this->get_db(true)->prepare($this->req('getLastId'));
-      if($st->execute()) {
-        return $st->fetch(\PDO::FETCH_NUM)[0];
-      }
-    } catch (\Exception $e) {
-      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-      return '0';
+    $st = $this->get_db(true)->prepare($this->req('getLastId'));
+    if($st->execute()) {
+      return $st->fetch(\PDO::FETCH_NUM)[0];
     }
-
     return '0';
   }
 
@@ -221,29 +191,19 @@ class SQL extends \artnum\JStore\OP {
     if (empty($date)) { return 0; }
     if (is_numeric($date)) { $val = '@' . $date; }
 
-    try {
-      $val = new \DateTime($val);
-      return $val->getTimestamp();
-    } catch(\Exception $e) {
-      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-      return 0;
-    }
+    $val = new \DateTime($val);
+    return $val->getTimestamp();
   }
 
   function getTableLastMod() {
     if($this->conf('mtime')) {
-      try {
-        $st = $this->get_db(true)->prepare($this->req('getTableLastMod'));
-        if($st->execute()) {
-          if ($this->conf('mtime.ts')) {
-            return (int)$st->fetch(\PDO::FETCH_NUM)[0];
-          } else {
-            return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
-          }
+      $st = $this->get_db(true)->prepare($this->req('getTableLastMod'));
+      if($st->execute()) {
+        if ($this->conf('mtime.ts')) {
+          return (int)$st->fetch(\PDO::FETCH_NUM)[0];
+        } else {
+          return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
         }
-      } catch( \Exception $e) {
-        $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-        return '0';
       }
     }
 
@@ -255,18 +215,13 @@ class SQL extends \artnum\JStore\OP {
       return '1';
     }
     if (!is_null($this->conf('delete'))) {
-      try {
-        $st = $this->get_db(true)->prepare($this->req('getDeleteDate'));
-        if ($st) {
-          $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-          $st->bindParam(':id', $item, $bind_type);
-          if($st->execute()) {
-            return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
-          }
+      $st = $this->get_db(true)->prepare($this->req('getDeleteDate'));
+      if ($st) {
+        $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+        $st->bindParam(':id', $item, $bind_type);
+        if($st->execute()) {
+          return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
         }
-      } catch(\Exception $e) {
-        $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-        return '0';
       }
     } else {
       return '0';
@@ -275,22 +230,17 @@ class SQL extends \artnum\JStore\OP {
 
   function getLastMod($item) {
     if(!is_null($this->conf('mtime'))) {
-      try {
-        $st = $this->get_db(true)->prepare($this->req('getLastMod'));
-        if($st) {
-          $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-          $st->bindParam(':id', $item, $bind_type);
-          if($st->execute()) {
-            if ($this->conf('mtime.ts')) {
-              return (int)$st->fetch(\PDO::FETCH_NUM)[0];
-            } else {
-              return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
-            }
+      $st = $this->get_db(true)->prepare($this->req('getLastMod'));
+      if($st) {
+        $bind_type = ctype_digit($item) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+        $st->bindParam(':id', $item, $bind_type);
+        if($st->execute()) {
+          if ($this->conf('mtime.ts')) {
+            return (int)$st->fetch(\PDO::FETCH_NUM)[0];
+          } else {
+            return $this->_timestamp($st->fetch(\PDO::FETCH_NUM)[0]);
           }
         }
-      } catch (\Exception $e) {
-        $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-        return '0';
       }
     }
     return '0';
@@ -342,6 +292,9 @@ class SQL extends \artnum\JStore\OP {
             break;
           case '#and':
             $relation = ' AND ';
+            break;
+          case '#not':
+            $relation = ' NOT ';
             break;
         }
         
@@ -614,14 +567,9 @@ class SQL extends \artnum\JStore\OP {
       unset($options['limit']);
     }
     $pre = $this->prepare_statement($this->req('count'), $options);
-    try {
-      $res = $this->get_db(false)->query($pre);
-      $data = $res->fetch();
-      return array($data[0], $data[0]);
-    } catch(\Exception $e) {
-      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-      return array(NULL, 0);
-    }
+    $res = $this->get_db(false)->query($pre);
+    $data = $res->fetch();
+    return array($data[0], $data[0]);
     return array(NULL, 0);
   }
 
@@ -690,7 +638,7 @@ class SQL extends \artnum\JStore\OP {
   }
   
   function search($body, $options) {
-    $result = new \artnum\JStore\Result();
+    $results = ['count' => 0];
     $statement = $this->req('get');
     $params = [];
     $count = 0;
@@ -701,121 +649,76 @@ class SQL extends \artnum\JStore\OP {
     }
     if(! empty($options['limit'])) {
       $statement .= ' ' . $this->prepareLimit($options['limit']);
-    }  
-
-    try {
-      $st = $this->get_db(true)->prepare($statement);
-      foreach ($params as $key => $value) {
-        switch($value[1]) {
-          default:
-          case 'str': 
-            $st->bindValue($key, $value[0], \PDO::PARAM_STR); break;
-          case 'int':
-            $st->bindValue($key, $value[0], \PDO::PARAM_INT); break;
-          case 'bool':
-            $st->bindValue($key, $value[0], \PDO::PARAM_BOOL); break;
-          case 'null':
-            $st->bindValue($key, $value[0], \PDO::PARAM_NULL); break;
-        }
-      }
-      if (!$st->execute()) {
-        $result->addError($st->errorInfo()[2], $st->errorInfo());
-        return $result;
-      }
-      $ids = [];
-      while ($row = $st->fetch(\PDO::FETCH_ASSOC)) {
-        if (in_array($row[$this->IDName], $ids)) { continue; }
-        $ids[] = $row[$this->IDName];
-        $row = $this->_postprocess($this->unprefix($row));
-        $row = $this->extendEntry($row, $result);
-        $result->addItem($row);
-      }
-    } catch (\Exception $e) {
-      $result->addError($e->getMessage(), $e);
     }
 
-    return $result;
+    $st = $this->get_db(true)->prepare($statement);
+    foreach ($params as $key => $value) {
+      switch($value[1]) {
+        default:
+        case 'str': 
+          $st->bindValue($key, $value[0], \PDO::PARAM_STR); break;
+        case 'int':
+          $st->bindValue($key, $value[0], \PDO::PARAM_INT); break;
+        case 'bool':
+          $st->bindValue($key, $value[0], \PDO::PARAM_BOOL); break;
+        case 'null':
+          $st->bindValue($key, $value[0], \PDO::PARAM_NULL); break;
+      }
+    }
+
+    if(!$st->execute()) {
+      throw new Exception($st->errorInfo()[2]);
+    }
+
+    $ids = [];
+    $this->response->start_output();
+    while ($row = $st->fetch(\PDO::FETCH_ASSOC)) {
+      if (in_array($row[$this->IDName], $ids)) { continue; }
+      $ids[] = $row[$this->IDName];
+      $row = $this->_postprocess($this->unprefix($row));
+      $row = $this->extendEntry($row, $result);
+      $this->response->print($row);
+      $results['count']++;
+    }
+    return $results;
   }
 
   function listing($options) {
-    $result = new \artnum\JStore\Result();
-    $ids = array();
+    $result = ['count' => 0];
+    $ids = [];
     $pre_statement = $this->prepare_statement($this->req('get'), $options);
-    try {
-      $st = $this->get_db(true)->prepare($pre_statement);
-      if(!$st->execute()) {
-        $result->addError($st->errorInfo()[2], $st->errorInfo());
-      } else{
-        $data = $st->fetchAll(\PDO::FETCH_ASSOC);
-        foreach($data as $d) {
-          if (!in_array($d[$this->IDName], $ids)) {
-            $id = $d[$this->IDName];
-            $d = $this->_postprocess($this->unprefix($d));
-            $d = $this->extendEntry($d, $result);
-            $result->addItem($d);
-            $ids[] = $id;
-          }
-        }
-      }
-    } catch(\Exception $e) {
-      $result->addError($e->getMessage(), $e);
+    $st = $this->get_db(true)->prepare($pre_statement);
+
+    if(!$st->execute()) {
+      throw new Exception($st->errorInfo()[2]);
+    }
+
+    $this->response->start_output();
+    while ($data = $st->fetch(\PDO::FETCH_ASSOC)) {
+      if (in_array($data[$this->IDName], $ids)) { continue; }
+      $ids[] = $data[$this->IDName];
+      $data = $this->_postprocess($this->unprefix($data));
+      $data = $this->extendEntry($data, $result);
+      $this->response->print($data);
+      $result['count']++;
     }
 
     return $result;
   }
 
   function _read($id) {
-    $result = new \artnum\JStore\Result();
-    if ($this->cache) {
-      $cached = $this->cache->get($this->Table . ':' . $id);
-  
-      if ($cached) {
-        $result->addItem(unserialize($cached));
-        return $result;
-      }
-    }
-    $results = $this->listing(array('search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)));
-
-    if (is_array($results)) {
-      if ($results[1] !== 1) {
-        $result->addError('Not one result as expected');
-      } else {
-        $result->addItem($results[0][0]);
-      }
-    } else {
-      $result->copyError($results);
-      if($results->getCount() !== 1) {
-        $result->addError('Not one result as expected');
-      } else {
-        $result->addItem($results->getItems()[0]);
-      }
-    }
-    if ($this->cache) {
-      $this->cache->set($this->Table . ':' . $id, serialize($result->getItem(0)));
-    }
-    return $result;
+    return $this->listing(['search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)]);
   }
 
   function _exists($id) {
-    if ($this->cache) {
-      if ($this->cache->set($this->Table . ':' . $id)) { 
-        return true;
+    $st = $this->get_db(true)->prepare($this->req('exists'));
+    $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+    $st->bindParam(':id', $id, $bind_type);
+    if($st->execute()) {
+      if($st->fetch()) {
+        return TRUE;
       }
     }
-    try {
-      $st = $this->get_db(true)->prepare($this->req('exists'));
-      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-      $st->bindParam(':id', $id, $bind_type);
-      if($st->execute()) {
-        if($st->fetch()) {
-          return TRUE;
-        }
-      }
-    } catch(\Exception $e) {
-      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-      return FALSE;
-    }
-
     return FALSE;
   }
 
@@ -852,44 +755,39 @@ class SQL extends \artnum\JStore\OP {
     $columns_txt = implode(',', $columns);
     $values_txt = implode(',', $values);
 
-    try {
-      $db = $this->get_db(false);
-      $st = $db->prepare($this->req('create', array('COLTXT' => $columns_txt, 'VALTXT' => $values_txt)));
-      foreach($data as $k_data => &$v_data) {
-        $bind_type = $this->_type($k_data, $v_data);
-        if (is_null($bind_type)) {
-          $bind_type = \PDO::PARAM_STR;
-          if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
-          else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
-          else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
-        }
-
-        $st->bindParam(':' . $k_data, $v_data, $bind_type);
+    $db = $this->get_db(false);
+    $st = $db->prepare($this->req('create', array('COLTXT' => $columns_txt, 'VALTXT' => $values_txt)));
+    foreach($data as $k_data => &$v_data) {
+      $bind_type = $this->_type($k_data, $v_data);
+      if (is_null($bind_type)) {
+        $bind_type = \PDO::PARAM_STR;
+        if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
+        else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
+        else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
       }
 
-      $transaction = false;
-      if($this->conf('auto-increment')) {
-        $db->beginTransaction();
-        $transaction = true;
-      }
+      $st->bindParam(':' . $k_data, $v_data, $bind_type);
+    }
 
-      if(! $st->execute()) {
-        if($transaction) {
-          $db->rollback();
-        }
+    $transaction = false;
+    if($this->conf('auto-increment')) {
+      $db->beginTransaction();
+      $transaction = true;
+    }
 
-        return FALSE;
+    if(! $st->execute()) {
+      if($transaction) {
+        $db->rollback();
       }
-      if($this->conf('auto-increment')) {
-        $idx = $db->lastInsertId($this->IDName);
-        $db->commit();
-        return $idx;
-      } else {
-        return $data[$this->IDName];
-      }
-    } catch (\Exception $e) {
-      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-      return FALSE;
+      throw new Exception('Create failed');
+    }
+    
+    if($this->conf('auto-increment')) {
+      $idx = $db->lastInsertId($this->IDName);
+      $db->commit();
+      return $idx;
+    } else {
+      return $data[$this->IDName];
     }
   }
 
@@ -906,31 +804,26 @@ class SQL extends \artnum\JStore\OP {
     }
     $columns_values_txt = implode(',', $columns_values);
 
-    try {
-      $db = $this->get_db(false);
-      $st = $db->prepare($this->req('update', array('COLVALTXT' => $columns_values_txt)));
-      foreach($data as $k_data => &$v_data) {
-        $bind_type = $this->_type($k_data, $v_data);
-        if (is_null($bind_type)) {
-          $bind_type = \PDO::PARAM_STR;
-          if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
-          else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
-          else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
-        }
+    $db = $this->get_db(false);
+    $st = $db->prepare($this->req('update', array('COLVALTXT' => $columns_values_txt)));
+    foreach($data as $k_data => &$v_data) {
+      $bind_type = $this->_type($k_data, $v_data);
+      if (is_null($bind_type)) {
+        $bind_type = \PDO::PARAM_STR;
+        if(is_null($v_data)) { $bind_type = \PDO::PARAM_NULL; }
+        else if(ctype_digit($v_data)) { $bind_type = \PDO::PARAM_INT; }
+        else if(is_bool($v_data)) { $bind_type = \PDO::PARAM_BOOL; }
+      }
 
-        $st->bindParam(':' . $k_data, $v_data, $bind_type);
-      }
-      $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-      $st->bindParam(':' . $this->IDName, $id, $bind_type);
-      $ex = $st->execute();
-      if(! $ex) {
-        return FALSE;
-      }
-      return $id;
-    } catch(\Exception $e) {
-      $this->error('Database error : ' . $e->getMessage(), __LINE__, __FILE__);
-      return FALSE;
+      $st->bindParam(':' . $k_data, $v_data, $bind_type);
     }
+    $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+    $st->bindParam(':' . $this->IDName, $id, $bind_type);
+    $ex = $st->execute();
+    if(! $ex) {
+      throw new Exception('Update failed');
+    }
+    return $id;
   }
 
   function _overwrite($data, $id = NULL) {
@@ -946,9 +839,10 @@ class SQL extends \artnum\JStore\OP {
   }
 
   function _write($data, $id = NULL) {
-    $result = new \artnum\JStore\Result();
+    $result = ['count' => 1];
     $prefixed = array();
     $ignored = is_array($this->conf('ignored')) ? $this->conf('ignored') : array();
+
     foreach($data as $k => $v) {
       if (in_array($k, $ignored)) {
         continue;
@@ -981,15 +875,15 @@ class SQL extends \artnum\JStore\OP {
           $prefixed[$this->conf('create')] = time();
         }
       }
-      $result->addItem(['id' => $this->create($prefixed)]);
+      $result['id'] = $this->create($prefixed);
+      $this->response->start_output();
+      $this->response->print(['id' => $result['id']]);
     } else {
-      $result->addItem(['id' => $this->update($prefixed)]);
+      $result['id'] = $this->update($prefixed);
+      $this->response->start_output();
+      $this->response->print(['id' => $result['id']]);
     }
 
-    if ($this->cache) {
-      $this->cache->delete($this->Table . ':' . $id);
-    }
-  
     return $result;
   }
 

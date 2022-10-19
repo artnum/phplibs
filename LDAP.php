@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2017-2020 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2017-2022 Etienne Bagnoud <etienne@artisan-numerique.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 Namespace artnum;
+use \Exception;
 
 class LDAP extends \artnum\JStore\OP {
   protected $DB;
@@ -62,6 +63,10 @@ class LDAP extends \artnum\JStore\OP {
     $this->DB = $db;
   }
 
+  function get_db() {
+    return $this->DB;
+  }
+
   function getBase () {
     if ($this->base) {
       return $this->base;
@@ -96,42 +101,44 @@ class LDAP extends \artnum\JStore\OP {
   }
 
   function get($dn, $conn) {
-    try {
-      $dn = $this->_dn($dn);
-      $res = @ldap_read($conn, $dn, '(objectclass=*)', $this->Attribute ?? ['*']);
-      if ($res && ldap_count_entries($conn, $res) === 1) {
-        return ldap_first_entry($conn, $res);
-      }
-      return NULL;
-    } catch (\Exception $e) {
-      return NULL;
+    $dn = $this->_dn($dn);
+    $res = @ldap_read($conn, $dn, '(objectclass=*)', $this->Attribute ?? ['*']);
+    if ($res && ldap_count_entries($conn, $res) === 1) {
+      return ldap_first_entry($conn, $res);
     }
+    return NULL;
   }
 
   function _read($dn) {
-    $result = new \artnum\JStore\Result();
-    try {
-      $c = $this->DB->readable();
-      $dn = rawurldecode($dn);
-      $res = @ldap_read($c, $this->_dn($dn), '(objectclass=*)', $this->Attribute ?? ['*']);
-      if($res && ldap_count_entries($c, $res) == 1) {
-        $entry = $this->processEntry($c, ldap_first_entry($c, $res), $result);
-        if ($entry) {
-          $result->addItem($entry);
-        }
+    $c = $this->DB->readable();
+    $dn = rawurldecode($dn);
+    $res = @ldap_read($c, $this->_dn($dn), '(objectclass=*)', $this->Attribute ?? ['*']);
+    if (!$res) { 
+      switch (ldap_errno($c)) {
+        case 0x20:
+          return ['count' => 0];
+        default:
+          throw new Exception(ldap_error($c)); 
       }
-    } catch (\Exception $e) {
-      $result->addError($e->getMessage(), $e);
     }
-    return $result;
+    if(ldap_count_entries($c, $res) !== 1) { 
+      throw new Exception('Too many result');
+    }
+    $entry = $this->processEntry($c, ldap_first_entry($c, $res), $result);
+    if (!$entry) { throw new Exception('Error processing entry'); }
+    $this->response->start_output();
+    $this->response->print($entry);
+    return ['count' => 1];
+    
   }
 
   function _delete($dn) {
-    $result = new \artnum\JStore\Result();
+    $result = ['count' => 0, 'id' => $dn];
     $c = $this->DB->writable();
     if($this->exists($dn)) {
       if (ldap_delete($c, $this->_dn($dn))) {
-        $result->addItem($this->_dn($dn));
+        $this->response->print(['id' => $dn]);
+        $result['count']++;
       }
     }
     return $result;
@@ -182,6 +189,9 @@ class LDAP extends \artnum\JStore\OP {
             break;
           case '#and':
             $relation = '&';
+            break;
+          case '#not':
+            $relation = '!';
             break;
         }
         
@@ -393,55 +403,51 @@ class LDAP extends \artnum\JStore\OP {
     $attributes = $this->Attribute;
     if (!is_array($attributes)) { $attributes = null; }
     $entry = array();
-    try {
-      $_ber = NULL;
-      $dn = ldap_explode_dn(ldap_get_dn($conn, $ldapEntry), 0);
-      $entry['IDent'] = rawurlencode($dn[0]);
-      for (
-        $attr = ldap_first_attribute($conn, $ldapEntry, $_ber);
-        $attr !== FALSE;
-        $attr = ldap_next_attribute($conn, $ldapEntry, $_ber)
-      ) {
-        $attr = strtolower($attr);
-        $checkAttr = $attr;
-        $options = null;
-        if (strpos($attr, ';')) {
-          [$checkAttr, $options] = explode(';', $attr, 2);
-        }
-        if (!is_null($attributes) && !in_array($checkAttr, $attributes)) { continue; }
-
-        $value = array();
-        if (in_array($attr, $this->Binary)) {
-          $val = ldap_get_values_len($conn, $ldapEntry, $attr);
-          for ($i = 0; $i < $val['count']; $i++) {
-            $value[] = base64_encode($val[$i]);
-          }
-        } else {
-          $val = ldap_get_values($conn, $ldapEntry, $attr);
-          unset($val['count']);
-          $value = $val;
-        }
-
-        if (count($value) <= 0) { continue; }
-        if (count($value) === 1) { $value = $value[0]; }
-
-        if($options) {
-          if (!isset($entry[$checkAttr . ';'])) {
-            $entry[$checkAttr . ';'] = [];
-          }
-          $entry[$checkAttr . ';'][$options] = $value;
-        } else {
-          $entry[$attr] = $value;
-        }
+    $_ber = NULL;
+    $dn = ldap_explode_dn(ldap_get_dn($conn, $ldapEntry), 0);
+    $entry['IDent'] = rawurlencode($dn[0]);
+    for (
+      $attr = ldap_first_attribute($conn, $ldapEntry, $_ber);
+      $attr !== FALSE;
+      $attr = ldap_next_attribute($conn, $ldapEntry, $_ber)
+    ) {
+      $attr = strtolower($attr);
+      $checkAttr = $attr;
+      $options = null;
+      if (strpos($attr, ';')) {
+        [$checkAttr, $options] = explode(';', $attr, 2);
       }
-    } catch (\Exception $e) {
-      $result->addError($e->getMessage(), $e);
+      if (!is_null($attributes) && !in_array($checkAttr, $attributes)) { continue; }
+
+      $value = array();
+      if (in_array($attr, $this->Binary)) {
+        $val = ldap_get_values_len($conn, $ldapEntry, $attr);
+        for ($i = 0; $i < $val['count']; $i++) {
+          $value[] = base64_encode($val[$i]);
+        }
+      } else {
+        $val = ldap_get_values($conn, $ldapEntry, $attr);
+        unset($val['count']);
+        $value = $val;
+      }
+
+      if (count($value) <= 0) { continue; }
+      if (count($value) === 1) { $value = $value[0]; }
+
+      if($options) {
+        if (!isset($entry[$checkAttr . ';'])) {
+          $entry[$checkAttr . ';'] = [];
+        }
+        $entry[$checkAttr . ';'][$options] = $value;
+      } else {
+        $entry[$attr] = $value;
+      }
     }
     return $entry;
   }
 
   function search($body, $options) {
-    $result = new \artnum\JStore\Result();
+    $result = ['count' => 0];
     $c = $this->DB->readable();
 
     $params = [];
@@ -459,16 +465,21 @@ class LDAP extends \artnum\JStore\OP {
     $filter = str_replace('[[ANY]]', '*', $filter);
 
     $res = @ldap_list($c, $this->_dn(), $filter, $this->Attribute ?? [ '*' ], 0, $limit);
-    if($res) {
-      for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
-        $result->addItem($this->processEntry($c, $e, $result));
-      }
+    if(!$res) { throw new Exception(ldap_error($c)); }
+    
+    $this->response->start_output();
+    for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
+      $entry = $this->processEntry($c, $e, $result);
+      if (is_null($entry)) { continue; }
+      $this->response->print($entry);
+      $result['count']++;
     }
+  
     return $result;
   }
 
   function listing($options) {
-    $result = new \artnum\JStore\Result();
+    $result = ['count' => 0];
     $c = $this->DB->readable();
     if(!empty($options['search'])) {
       $filter = $this->prepareSearch($options['search']);
@@ -480,11 +491,14 @@ class LDAP extends \artnum\JStore\OP {
       $limit = intval($options['limit']);
     }
     $res = @ldap_list($c, $this->_dn(), $filter, $this->Attribute ?? [ '*' ], 0, $limit);
-    if($res) {
-      for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
-        $result->addItem($this->processEntry($c, $e, $result));
-      }
+    if(!$res) { throw new Exception(ldap_error($c)); }
+    
+    $this->response->start_output();
+    for($e = ldap_first_entry($c, $res); $e; $e = ldap_next_entry($c, $e)) {
+      $this->response->print($this->processEntry($c, $e, $result));
+      $result['count']++;
     }
+  
     return $result;
   }
 
@@ -524,7 +538,6 @@ class LDAP extends \artnum\JStore\OP {
   }
   
   function do_write ($data, $overwrite = false) {
-    $result = new \artnum\JStore\Result();
     $conn = $this->DB->writable();
 
     $singleValue = $this->conf('singleValue');
@@ -539,7 +552,7 @@ class LDAP extends \artnum\JStore\OP {
     if (isset($data['IDent'])) {
       $ident = rawurldecode($data['IDent']);
       $entry = $this->get($ident, $conn);
-      if ($entry === NULL) { $result->addError('Unknown entry'); return $result; }
+      if ($entry === NULL) { throw new Exception('Unknown entry'); }
       $dn = ldap_get_dn($conn, $entry);
       $mods = array();
       $entryVal = array();
@@ -592,25 +605,23 @@ class LDAP extends \artnum\JStore\OP {
             $mod['modtype'] !== LDAP_MODIFY_BATCH_REMOVE_ALL && count($mod['values']) > 1) {
           $mod['values'] = array($mod['values'][0]);
         }
-        try {
-          $r = false;
-          switch ($mod['modtype']) {
-            case LDAP_MODIFY_BATCH_REMOVE_ALL:
-              $r = ldap_mod_del($conn, $dn, [$mod['attrib'] => []]);
-              $modResults[] = [$mod['attrib'] => $r, 'op' => 'remove']; break;
-            case LDAP_MODIFY_BATCH_ADD:
-              $r = @ldap_mod_add($conn, $dn, array($mod['attrib'] => $mod['values']));
-              $modResults[] = [$mod['attrib'] => $r, 'op' => 'add']; break;
-            case LDAP_MODIFY_BATCH_REPLACE:
-              $r = @ldap_mod_replace($conn, $dn, array($mod['attrib'] => $mod['values']));
-              $modResults[] = [$mod['attrib'] => $r, 'op' => 'modify']; break;
-          }
-          if ($r === false) { $fullSuccess = false; }
-        } catch (\Exception $e) {
-          $result->addError($e->getMessage());
+        $r = false;
+        switch ($mod['modtype']) {
+          case LDAP_MODIFY_BATCH_REMOVE_ALL:
+            $r = ldap_mod_del($conn, $dn, [$mod['attrib'] => []]);
+            $modResults[] = [$mod['attrib'] => $r, 'op' => 'remove']; break;
+          case LDAP_MODIFY_BATCH_ADD:
+            $r = @ldap_mod_add($conn, $dn, array($mod['attrib'] => $mod['values']));
+            $modResults[] = [$mod['attrib'] => $r, 'op' => 'add']; break;
+          case LDAP_MODIFY_BATCH_REPLACE:
+            $r = @ldap_mod_replace($conn, $dn, array($mod['attrib'] => $mod['values']));
+            $modResults[] = [$mod['attrib'] => $r, 'op' => 'modify']; break;
         }
+        if ($r === false) { $fullSuccess = false; }
       }
-      $result->addItem(['IDent' => $ident, 'success' => $fullSuccess, 'op' => 'edit', 'details' => $modResults]);
+      $this->response->start_output();
+      $this->repsonse->print(['IDent' => $ident, 'success' => $fullSuccess, 'op' => 'edit', 'details' => $modResults]);
+      return ['count' => 1, 'id' => $ident];
     } else {
       $rdnVal = $this->getRdnValue($data);
       $dn = $this->buildDn($rdnVal);
@@ -647,20 +658,16 @@ class LDAP extends \artnum\JStore\OP {
         }
         $entry[$k] = array($value);
       }
-      try {
-        if (@ldap_add($conn, $dn, $entry)) {
-          $dn = ldap_explode_dn($dn, 0);
-          $ident = rawurlencode($dn[0]);
-          $result->addItem(['IDent' => $ident, 'success' => true, 'op' => 'add']);
-        } else {
-          $result->addItem(['IDent' => null, 'success' => false, 'op' => 'add']);
-          $result->addError(ldap_error($conn));
-        }
-      } catch (\Exception $e) {
-        $result->addError($e->getMessage());
+      if (@ldap_add($conn, $dn, $entry)) {
+        $dn = ldap_explode_dn($dn, 0);
+        $ident = rawurlencode($dn[0]);
+        $this->response->start_output();
+        $this->response->print(['IDent' => $ident, 'success' => true, 'op' => 'add']);
+        return ['count' => 1, 'id' => $ident];
+      } else {
+        throw new Exception(ldap_error($conn));
       }
     }
-    return $result;
   }
   
   function _write ($data) {

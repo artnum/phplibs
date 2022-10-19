@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2017 - 2020 Etienne Bagnoud <etienne@artnum.ch>
+ * Copyright (c) 2017 - 2022 Etienne Bagnoud <etienne@artnum.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,7 +36,6 @@ class JsonRequest extends Path
   public $items;
   public $http_headers = array();
   public $clientReqId = null;
-  private $hashCtx;
 
   function __construct()
   {
@@ -51,18 +50,11 @@ class JsonRequest extends Path
       $this->url_elements = array($collection, $item);
     }
 
-    /* fix algo to sha256 */
-    $this->hashCtx = hash_init('sha256');
-
     $this->multiple = false;
     $this->items = array();
     $this->verb = $_SERVER['REQUEST_METHOD'];
     $this->protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
     $this->client = $_SERVER['REMOTE_ADDR'];
-
-    hash_update($this->hashCtx, $this->verb);
-    hash_update($this->hashCtx, $this->protocol);
-    hash_update($this->hashCtx, $this->client);
 
     $this->parseParams();
 
@@ -75,30 +67,23 @@ class JsonRequest extends Path
 
     foreach ($_SERVER as $k => $v) {
       switch ($k) {
-        case 'HTTP_X_ARTNUM_REQID':
-          /* use X-Request-Id if available, X-Artnum-ReqID is obsolete */
-          if (!empty($_SERVER['HTTP_X_REQUEST_ID'])) { break; } 
         case 'HTTP_X_REQUEST_ID':
-          hash_update($this->hashCtx, 'X-Request-Id: '. $_SERVER['HTTP_X_REQUEST_ID']);
           $this->clientReqId = $_SERVER['HTTP_X_REQUEST_ID'];
           break;
       }
       if (substr_compare($k, 'HTTP', 0, 4, TRUE) === 0) {
         $k = strtolower(str_replace('_', '-', substr($k, 0, 5)));
-        hash_update($this->hashCtx, $k . ': ' .$v);
         $this->http_headers[$k] = $v;
       }
     }
-
-    $this->reqid = hash_final($this->hashCtx, FALSE);
   }
 
   function getId() {
-    return bin2hex($this->reqid);
+    return $this->clientReqId;
   }
 
   function getRawId() {
-    return $this->reqid;
+    return $this->clientReqId;
   }
 
   function getClient()  {
@@ -248,13 +233,11 @@ class JsonRequest extends Path
     $params = array();
 
     if(isset($_SERVER['QUERY_STRING'])) {
-      hash_update($this->hashCtx, $_SERVER['QUERY_STRING']);
       $params = $this->_parse_str($_SERVER['QUERY_STRING']);
     }
 
     $content = file_get_contents('php://input');
     if($content !== FALSE) {
-      hash_update($this->hashCtx, $content);
       if(isset($_SERVER['CONTENT_TYPE']) && strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
         $body = [];
         foreach($this->_parse_str($content) as $_k => $_v) {

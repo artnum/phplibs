@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2017-2018 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2017-2022 Etienne Bagnoud <etienne@artisan-numerique.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,11 @@ abstract class OP {
 
    function __construct($config) {
       $this->Config = $config;
+      $this->response = null;
+   }
+
+   function set_response($response) {
+      $this->response = $response;
    }
 
    function conf($name, $value = NULL) {

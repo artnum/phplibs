@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2018-2020 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2018-2022 Etienne Bagnoud <etienne@artisan-numerique.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,6 +26,8 @@
  */
 Namespace artnum\JStore;
 
+use Exception;
+
 class Generic { 
   public $db;
   public $request;
@@ -38,9 +40,9 @@ class Generic {
   function __construct($http_request = NULL, $dont_run = false, $options = []) {
     $this->dbs = [];
     $this->signature = null;
-    $this->_tstart = microtime(true);
     $this->lockManager = null;
     $this->data = [];
+    $this->response = new \artnum\JStore\Response();
 
     if (!empty($options['postprocess']) && is_array($options['postprocess'])) {
       foreach ($options['postprocess'] as $fn) {
@@ -54,7 +56,7 @@ class Generic {
       try {
         $this->request = new \artnum\HTTP\JsonRequest();
       } catch(\Exception $e) {
-        $this->fail($e->getMessage());
+        $this->fail($this->response, $e->getMessage());
       }
     } else {
       $this->request = $http_request;
@@ -113,14 +115,14 @@ class Generic {
   }
 
   /* Internal query */
-  private function internal () {
+  private function internal ($response) {
     switch(strtolower(substr($this->request->getCollection(), 1))) {
       case 'lock':
         if (! $this->lockManager) {
-          $this->fail('No lock manager');
+          $this->fail($response, 'No lock manager');
         }
         if (! $this->request->onItem()) {
-          $this->fail('Lock must have an object to lock');
+          $this->fail($response, 'Lock must have an object to lock');
         } else {
           if (is_string($this->lockManager) && strcasecmp($this->lockManager, 'void') === 0) {
             switch($this->request->getParameter('operation')) {
@@ -134,7 +136,7 @@ class Generic {
             }
           } else {
             if (strtolower($this->request->getVerb()) != 'post') {
-              $this->fail('Lock only have a POST inteface');
+              $this->fail($response, 'Lock only have a POST inteface');
             }
             $lockOp = array('on' => $this->request->getItem(), 'operation' => '', 'key' => '');
             foreach($lockOp as $k => $v) {
@@ -144,7 +146,7 @@ class Generic {
             }
             $lock = $this->lockManager->request($lockOp);
             if (!$lock) {
-              $this->fail('Lock module fail');
+              $this->fail($response, 'Lock module fail');
             }
           }
           file_put_contents('php://output', json_encode($lock));
@@ -166,134 +168,98 @@ class Generic {
       error_log('Postprocess error : ' . $e->getMessage());
     }
   }
-        
-  private function _t() {
-    header('X-Artnum-execution-us: ' . intval((microtime(true) - $this->_tstart) * 1000000));
-  }
 
   function run($conf = null) {
-    header('Content-Type: application/json');
+    $response = $this->response;
   
     if (substr($this->request->getCollection(), 0, 1) == '.') {
-      $ret = $this->internal();
+      $ret = $this->internal($response);
       return $ret;
     } 
 
     /* run user code */
     if(!ctype_alpha($this->request->getCollection())) {
-      $this->fail('Collection not valid');
+      $this->fail($response, 'Collection not valid');
     }
 
     /* prepare model */
     $model = '\\' . $this->request->getCollection() . 'Model';
     if(!class_exists($model)) {
-      $this->fail('Store doesn\'t exist');
+      $this->fail($response, 'Store doesn\'t exist');
     }
     
     try {
-      $model = new $model(NULL, $conf);
+      $xmodel = $model;
+      $model = new $model(null, $conf);
+      $model->set_response($response);
       $model->set_db($this->_db($model));
-      $controller = new \artnum\JStore\HTTP($model, NULL);
+      $controller = new \artnum\JStore\HTTP($model, $response);
       
       if (method_exists($model, 'getCacheOpts')) {
         $copts = $model->getCacheOpts();
         if (!empty($copts['age']) && is_int($copts['age'])) {
           $maxage = ', max-age=' . $copts['age'];
           if ($copts['public']) {
-            header('Cache-Control: public' . $maxage);
+            $response->header('Cache-Control', 'public' . $maxage);
           } else {
-            header('Cache-Control: private' . $maxage);
+            $response->header('Cache-Control', 'private' . $maxage);
           }
         } else {
-          header('Cache-Control: no-store, max-age=0');
+          $response->header('Cache-Control', 'no-store, max-age=0');
         }
       } else {
-        header('Cache-Control: no-store, max-age=0');
+        $response->header('Cache-Control', 'no-store, max-age=0');
       }
-
+      
+      $response->header('Content-Type', 'application/json');
+      $response->echo('{"data":[');
       $results = array('success' => false, 'type' => 'results', 'data' => null, 'length' => 0);
       $action = strtolower($this->request->getVerb()) . 'Action';
       $results = $controller->$action($this->request);
-      switch(strtolower($this->request->getVerb())) {
-        default:
-          if ($results['success']) {
-            $results['msg'] = 'OK';
-          }
-          if (isset($results['result'])) {
-            $body = '{' . 
-              '"success":' . ($results['success'] ? 'true' : 'false') . ', ' . 
-              '"type": "results", ' . 
-              '"store": "' . $this->request->getCollection() . '", ' . 
-              '"message": "' . $results['msg'] . '", ' . 
-              '"data": ' . $results['result']->toJson() . ', ' .
-              '"length": ' . $results['result']->getCount() .
-              '}';
-          } else {
-            $body = json_encode(array(
-              'success' => $results['success'],
-              'type' => 'results',
-              'store' => $this->request->getCollection(),
-              'message' => $results['msg'],
-              'data' => $results['data'][0],
-              'length' => $results['data'][1]
-            ));
-          }
-          if (!$body) {
-            $this->fail(json_last_error_msg());
-          }
-          $reqId = $this->request->getClientReqId();
-          if (!$reqId) {
-            $reqId = '';
-          }
 
-          $this->_t();
-          file_put_contents('php://output', $body);
-          $this->postprocess();
-          if (isset($results['result'])) {
-            if ($results['result']->countError() > 0) {
-              foreach ($results['result']->getError() as $error) {
-                error_log(sprintf('%d ReqID[%s]/%s/%s@%s:%s +%s+',
-                                  $error['time'],
-                                  $reqId,
-                                  $this->request->url_elements[0],
-                                  isset($this->request->url_elements[1]) ? $this->request->url_elements[1] : '',
-                                  $error['file'],
-                                  $error['line'],
-                                  addslashes($error['message'])), 0);
-              }
-            }
-          }
-          break;
-        case 'head':
-          foreach($results as $k => $v) {
-            header('X-Artnum-' . $k . ': ' . $v);
-          }
-          if (!isset($results['exists']) || !$results['exists']) {
-            \artnum\HTTP\Response::code(404);
-          }
-          $this->_t();
-          $this->postprocess();
-          break;
+      $reqId = $this->request->getClientReqId();
+      if (!$reqId) {
+        $reqId = '';
       }
-    } catch(\Exception $e) {
-      $this->fail($e->getMessage());
+      
+      $response->echo(
+        sprintf('],"success":true,"type":"results","store":"%s","message":"OK","length":%d}',
+          $this->request->getCollection(),
+          $results['count'])
+      );
+      $response->stop_output();
+
+      $this->postprocess();
+      if (isset($results['result'])) {
+        if ($results['result']->countError() > 0) {
+          foreach ($results['result']->getError() as $error) {
+            error_log(sprintf('%d ReqID[%s]/%s/%s@%s:%s +%s+',
+                              $error['time'],
+                              $reqId,
+                              $this->request->url_elements[0],
+                              isset($this->request->url_elements[1]) ? $this->request->url_elements[1] : '',
+                              $error['file'],
+                              $error['line'],
+                              addslashes($error['message'])), 0);
+          }
+        }
+      }
+    } catch(Exception $e) {
+      $this->fail($response, $e->getMessage());
     }
   }
 
-  function fail($message, $code = 500) {
-    if(!is_string($message)) {
-      $message = $message->getMessage();
+  function fail($response, $message, $code = 500) {
+    if ($message instanceof Exception) {
+        $c = $message->getCode();
+        if ($c !== 0) { $code = $c; }
+        $message = $message->getMessage();
     }
-    \artnum\HTTP\Response::code($code); 
-    $body = json_encode([
-      'success' => false,
-      'type' => 'error',
-      'message' => $message,
-      'data' => [],
-      'length' => 0]);
-    $this->_t();
-    file_put_contents('php://output', $body);
-    exit(-1); 
+    http_response_code($code);
+    header('Content-Type: application/json', true);
+    $response->code($code);
+    $response->echo(sprintf('],"success":false,"type":"error","message":%s,"length":0}', json_encode($message)));
+    exit(0);
   }
 }
 ?>
