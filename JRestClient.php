@@ -43,6 +43,7 @@ class JRestClient {
       $this->url = $url;
       $this->collection = $collection;
       $this->tls = $tls;
+      $this->authData = null;
    }
   
    protected function _tls() {
@@ -95,6 +96,10 @@ class JRestClient {
       $this->collection = $collection;
    }
 
+   function setAuth ($auth) {
+      $this->authData = $auth;
+   }
+
    protected function exec() {
       $xreqid = false;
       if (count($this->queryHeaders) > 0) {
@@ -108,7 +113,9 @@ class JRestClient {
       if (!$xreqid) {
          $headers[] = 'X-Request-Id: ' . uniqid();
       }
-
+      if ($this->authData) {
+         $headers[] = 'Authorization: ' . $this->authData;
+      }
       curl_setopt($this->ch, \CURLOPT_HTTPHEADER, $headers);
 
       $ret = curl_exec($this->ch);
