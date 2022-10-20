@@ -258,7 +258,7 @@ class Generic {
     http_response_code($code);
     header('Content-Type: application/json', true);
     $response->code($code);
-    $response->echo(sprintf('],"success":false,"type":"error","message":%s,"length":0}', json_encode($message)));
+    $response->echo(sprintf('{"data":[],"success":false,"type":"error","message":%s,"length":0}', json_encode($message)));
     exit(0);
   }
 }
