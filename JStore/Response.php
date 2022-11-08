@@ -35,6 +35,7 @@ class Response {
     $this->first = true;
     $this->code = 200;
     $this->hasPartialData = false;
+    $this->headerSent = false;
   }
 
   function stop_output() {
@@ -69,9 +70,12 @@ class Response {
 
   function start_output () {
     if ($this->output_started) { return; }
-    http_response_code($this->code);
-    foreach ($this->headers as $header) {
-      header($header, true);
+    if (!$this->headerSent) {
+      http_response_code($this->code);
+      foreach ($this->headers as $header) {
+        header($header, true);
+      }
+      $this->headerSent = true;
     }
     ob_flush();
   }

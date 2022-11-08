@@ -242,9 +242,9 @@ class Generic {
       $action = strtolower($this->request->getVerb()) . 'Action';
       $results = $this->controller->$action($this->request);
 
-      if (!empty($this->model->getOperation()[0])) {
+      /*if (!empty($this->model->getOperation()[0])) {
         error_log(sprintf('%d, %s: %s/%s' , time(), $this->model->getOperation()[0], $this->collection, $this->model->getOperation()[1]));
-      }
+      }*/
 
       $reqId = $this->request->getClientReqId();
       if (!$reqId) {
