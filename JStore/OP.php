@@ -28,8 +28,10 @@ Namespace artnum\JStore;
 
 abstract class OP {
    protected $Config;
+   protected $operation;
 
    function __construct($config) {
+      $this->operation = ['', ''];
       $this->Config = $config;
       $this->response = null;
    }
@@ -66,24 +68,33 @@ abstract class OP {
       return null;
    }
 
-   function write($arg, $id = NULL) {
+   function write($arg, &$id = NULL) {
       if ($this->conf('readonly')) {
          return false;
       }
-      return $this->_write($arg, $id);
+      if ($id) { $this->operation[0] = 'modify'; }
+      else { $this->operation[0] = 'create'; }
+      $retval = $this->_write($arg, $id);
+      $this->operation[1] = $id;
+      return $retval;
    }
 
-   function overwrite($arg, $id = NULL) {
+   function overwrite($arg, &$id = NULL) {
       if ($this->conf('readonly')) {
          return false;
       }
-      return $this->_overwrite($arg, $id);
+      if ($id) { $this->operation[0] = 'modify'; }
+      else { $this->operation[0] = 'create'; }
+      $retval = $this->_overwrite($arg, $id);
+      $this->operation[1] = $id;
+      return $retval;
    }
 
    function delete($arg) {
       if ($this->conf('readonly') || $this->conf('no-delete')) {
          return false;
       }
+      $this->operation = ['delete', $arg];
       return $this->_delete($arg);
    }
 
@@ -96,6 +107,10 @@ abstract class OP {
 
    function error($msg, $line = __LINE__, $file = __FILE__) {
       error_log("$file:$line:" . get_class($this) . ", $msg");
+   }
+
+   function getOperation() {
+      return $this->operation;
    }
 
    abstract protected function _write($arg);

@@ -38,6 +38,7 @@ class LDAP extends \artnum\JStore\OP {
     $this->base = $base;
     $this->Config = $config;
     $this->Binary = [];
+    $this->filterAttributes = [];
     
     if(isset($this->Config['binary']) && is_array($this->Config['binary'])) {
       foreach($this->Config['binary'] as $b) {
@@ -53,6 +54,11 @@ class LDAP extends \artnum\JStore\OP {
     } else {
       $this->Attribute = null;
     }
+  }
+
+
+  function setAttributeFilter($attributes = []) {
+    $this->filterAttributes = $attributes;
   }
 
   function dbtype() {
@@ -411,6 +417,7 @@ class LDAP extends \artnum\JStore\OP {
       $attr !== FALSE;
       $attr = ldap_next_attribute($conn, $ldapEntry, $_ber)
     ) {
+      if (in_array($attr, $this->filterAttributes)) { continue; }
       $attr = strtolower($attr);
       $checkAttr = $attr;
       $options = null;
@@ -537,7 +544,7 @@ class LDAP extends \artnum\JStore\OP {
     return hash_final($ctx);
   }
   
-  function do_write ($data, $overwrite = false) {
+  function do_write ($data, $overwrite = false, &$id = null) {
     $conn = $this->DB->writable();
 
     $singleValue = $this->conf('singleValue');
@@ -551,6 +558,7 @@ class LDAP extends \artnum\JStore\OP {
     
     if (isset($data['IDent'])) {
       $ident = rawurldecode($data['IDent']);
+      $id = $ident;
       $entry = $this->get($ident, $conn);
       if ($entry === NULL) { throw new Exception('Unknown entry'); }
       $dn = ldap_get_dn($conn, $entry);
@@ -624,6 +632,7 @@ class LDAP extends \artnum\JStore\OP {
       return ['count' => 1, 'id' => $ident];
     } else {
       $rdnVal = $this->getRdnValue($data);
+      $id = $rdnVal;
       $dn = $this->buildDn($rdnVal);
       if (is_callable($this->conf('objectclass'))) {
         $entry = ['objectclass' => $this->conf('objectclass')($data), $this->conf('rdnAttr') => array($rdnVal)];
@@ -670,11 +679,16 @@ class LDAP extends \artnum\JStore\OP {
     }
   }
   
-  function _write ($data) {
-    return $this->do_write($data);
+  function get_owner ($data, $id = null) {
+    if ($id === null) { return -1; }
+    return -1;
   }
-  function _overwrite ($data) {
-    return $this->do_write($data, true);
+
+  function _write ($data, &$id = null) {
+    return $this->do_write($data, false, $id);
+  }
+  function _overwrite ($data, &$id = null) {
+    return $this->do_write($data, true, $id);
   }
 }
 ?>

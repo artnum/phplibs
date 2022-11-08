@@ -43,6 +43,12 @@ class Generic {
     $this->lockManager = null;
     $this->data = [];
     $this->response = new \artnum\JStore\Response();
+    $this->acl = null;
+
+    $this->collection = '';
+    $this->user = -1;
+    $this->model = null;
+    $this->controller = null;
 
     if (!empty($options['postprocess']) && is_array($options['postprocess'])) {
       foreach ($options['postprocess'] as $fn) {
@@ -169,34 +175,53 @@ class Generic {
     }
   }
 
-  function run($conf = null) {
+  function getCollection() {
+    return $this->collection;
+  }
+
+  function getOperation() {
+    return $this->controller->getOperation($this->request);
+  }
+
+  function getOwner() {
+    return $this->controller->getOwner($this->request);
+  }
+
+  function setAcl(ACL $acl) {
+    $this->acl = $acl;
+  }
+
+
+  function init($conf = null) {
+    /* run user code */
+    if(!ctype_alpha($this->request->getCollection())) {
+      $this->fail($this->response, 'Collection not valid');
+    }
+
+    /* prepare model */
+    $this->collection = $this->request->getCollection();
+    $model = '\\' . $this->collection . 'Model';
+    if(!class_exists($model)) {
+      $this->fail($this->response, 'Store doesn\'t exist');
+    }
+
+    $this->model = new $model(null, $conf);
+    $this->model->set_response($this->response);
+    $this->model->set_db($this->_db($this->model));
+    $this->controller = new \artnum\JStore\HTTP($this->model, $this->response);
+  }
+
+  function run() {
     $response = $this->response;
   
     if (substr($this->request->getCollection(), 0, 1) == '.') {
       $ret = $this->internal($response);
       return $ret;
     } 
-
-    /* run user code */
-    if(!ctype_alpha($this->request->getCollection())) {
-      $this->fail($response, 'Collection not valid');
-    }
-
-    /* prepare model */
-    $model = '\\' . $this->request->getCollection() . 'Model';
-    if(!class_exists($model)) {
-      $this->fail($response, 'Store doesn\'t exist');
-    }
     
     try {
-      $xmodel = $model;
-      $model = new $model(null, $conf);
-      $model->set_response($response);
-      $model->set_db($this->_db($model));
-      $controller = new \artnum\JStore\HTTP($model, $response);
-      
-      if (method_exists($model, 'getCacheOpts')) {
-        $copts = $model->getCacheOpts();
+      if (method_exists($this->model, 'getCacheOpts')) {
+        $copts = $this->model->getCacheOpts();
         if (!empty($copts['age']) && is_int($copts['age'])) {
           $maxage = ', max-age=' . $copts['age'];
           if ($copts['public']) {
@@ -215,7 +240,11 @@ class Generic {
       $response->echo('{"data":[');
       $results = array('success' => false, 'type' => 'results', 'data' => null, 'length' => 0);
       $action = strtolower($this->request->getVerb()) . 'Action';
-      $results = $controller->$action($this->request);
+      $results = $this->controller->$action($this->request);
+
+      if (!empty($this->model->getOperation()[0])) {
+        error_log(sprintf('%d, %s: %s/%s' , time(), $this->model->getOperation()[0], $this->collection, $this->model->getOperation()[1]));
+      }
 
       $reqId = $this->request->getClientReqId();
       if (!$reqId) {
@@ -257,8 +286,12 @@ class Generic {
     }
     http_response_code($code);
     header('Content-Type: application/json', true);
-    $response->code($code);
-    $response->echo(sprintf('{"data":[],"success":false,"type":"error","message":%s,"length":0}', json_encode($message)));
+    if ($response->isOutputClean()) {
+      $response->code($code);
+      $response->echo(sprintf('{"data":[],"success":false,"type":"error","message":%s,"length":0}', json_encode($message)));
+    } else {
+      $response->echo(sprintf('],"success":false,"type":"error","message":%s,"length":0,"http-code":%d}', json_encode($message), $code));
+    }
     exit(0);
   }
 }

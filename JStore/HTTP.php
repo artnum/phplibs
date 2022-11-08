@@ -59,6 +59,34 @@ class HTTP extends \artnum\HTTP\CORS
     }
   }
 
+  function getOperation($req) {
+    switch($req->getVerb()) {
+      case 'POST':
+        if ($req->onCollection()) { return ACL::LEVEL_CREATE; }
+        if ($req->onItem() && $req->getItem() === '_query') { return ACL::LEVEL_SEARCH; }
+        if ($req->onItem()) { return ACL::LEVEL_UPDATE; }
+        return ACL::LEVEL_CREATE;
+      case 'PUT': // fall through
+      case 'PATCH':
+        if ($req->onItem()) { return ACL::LEVEL_UPDATE; }
+        return ACL::LEVEL_CREATE;
+      case 'DELETE':
+        return ACL::LEVEL_DELETE;
+      case 'GET':
+        if ($req->onCollection()) { return ACL::LEVEL_SEARCH; }
+        return ACL::LEVEL_READ;
+      case 'HEAD':
+        return ACL::LEVEL_READ;
+    }
+  }
+
+  function getOwner($req) {
+    $id = null;
+    if ($req->onItem()) { $id = $req->getItem(); }
+    if ($id === '_query') { $id = null; }
+    return $this->Model->get_owner($req->getParameters(), $id);
+  }
+
   function getAction($req) {
     $this->setCorsHeaders();
     if($req->onCollection()) {
@@ -79,7 +107,8 @@ class HTTP extends \artnum\HTTP\CORS
   function patchAction ($req) {
     $this->setCorsHeaders();
     if($req->onCollection()) { throw new Exception('Not available'); }
-    return $this->Model->write($req->getParameters(), $req->getItem());
+    $id = $req->getItem();
+    return $this->Model->write($req->getParameters(), $id);
   }
 
   function putAction($req) {
@@ -110,17 +139,17 @@ class HTTP extends \artnum\HTTP\CORS
             return $this->Model->$method($req->getParameters());
           }
       }     
-      return $this->Model->overwrite($req->getParameters(), $req->getItem());
+      return $this->Model->overwrite($req->getParameters(), $item);
 
     }
     return $this->Model->write($req->getParameters());
-
   }
   
   function deleteAction($req) {
     $this->setCorsHeaders();
     if($req->onCollection()) { throw new Exception('Not available'); }
-    return $this->Model->delete($req->getItem());         
+    $item = $req->getItem();
+    return $this->Model->delete($item);         
   }
 }
 

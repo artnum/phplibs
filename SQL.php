@@ -61,6 +61,11 @@ class SQL extends \artnum\JStore\OP {
     $this->conf('Table', $table);
     $this->conf('IDName', $id_name);
     $this->DataLayer = new Data();
+    $this->filterAttributes = [];
+  }
+
+  function setAttributeFilter($attributes = []) {
+    $this->filterAttributes = $attributes;
   }
 
   function add_db($db, $readonly = false) {
@@ -583,6 +588,7 @@ class SQL extends \artnum\JStore\OP {
     foreach($entry as $k => $v) {
       $s = explode('_', $k, 2);
       if(count($s) <= 1) {
+        if (in_array($k, $this->filterAttributes)) { continue; }
         $unprefixed[$k] = $v;
       } else {
         /* if the prefix is from a different table, it means we are onto join request (or alike), so create subcategory */
@@ -599,6 +605,7 @@ class SQL extends \artnum\JStore\OP {
           }
           $unprefixed['_' . $s[0]][$s[1]] = $v;
         } else {
+          if (in_array($s[1], $this->filterAttributes)) { continue; }
           $unprefixed[$s[1]] = $v;
         }
       }
@@ -609,7 +616,6 @@ class SQL extends \artnum\JStore\OP {
         $unprefixed[$k] = null;
       }
     }
-
     return $unprefixed;
   }
 
@@ -675,7 +681,9 @@ class SQL extends \artnum\JStore\OP {
     while ($row = $st->fetch(\PDO::FETCH_ASSOC)) {
       if (in_array($row[$this->IDName], $ids)) { continue; }
       $ids[] = $row[$this->IDName];
-      $row = $this->_postprocess($this->unprefix($row));
+      $row = $this->unprefix($row);
+      if (empty($row)) { continue; }
+      $row = $this->_postprocess($row);
       $row = $this->extendEntry($row, $result);
       $this->response->print($row);
       $results['count']++;
@@ -697,7 +705,9 @@ class SQL extends \artnum\JStore\OP {
     while ($data = $st->fetch(\PDO::FETCH_ASSOC)) {
       if (in_array($data[$this->IDName], $ids)) { continue; }
       $ids[] = $data[$this->IDName];
-      $data = $this->_postprocess($this->unprefix($data));
+      $data = $this->unprefix($data);
+      if (empty($data)) { continue; }
+      $data = $this->_postprocess($data);
       $data = $this->extendEntry($data, $result);
       $this->response->print($data);
       $result['count']++;
@@ -826,7 +836,7 @@ class SQL extends \artnum\JStore\OP {
     return $id;
   }
 
-  function _overwrite($data, $id = NULL) {
+  function _overwrite($data, &$id = NULL) {
     $defaults = $this->conf('defaults');
     if (is_array($defaults)) {
       foreach($defaults as $k => $v) {
@@ -838,7 +848,7 @@ class SQL extends \artnum\JStore\OP {
     return $this->write($data, $id);
   }
 
-  function _write($data, $id = NULL) {
+  function _write($data, &$id = NULL) {
     $result = ['count' => 1];
     $prefixed = array();
     $ignored = is_array($this->conf('ignored')) ? $this->conf('ignored') : array();
@@ -889,6 +899,25 @@ class SQL extends \artnum\JStore\OP {
 
   function uid($data) {
     return \artnum\genId(serialize($data));
+  }
+
+  function get_owner($data, $id = null) {
+    if ($id === null) { return -1; }
+    $ownerField = $this->conf('owner');
+    if ($ownerField) {
+      try {
+        $db = $this->get_db(true);
+        $stmt = $db->prepare(sprintf('SELECT %s FROM %s WHERE %s = :id', $ownerField, $this->conf('Table'), $this->conf('IDName')));
+        $stmt->bindValue(':id', $id, \PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(\PDO::FETCH_NUM);
+        error_log('Owner for project ' . $row[0]);
+        return $row[0];
+      } catch (Exception $e) {
+        return null;
+      }
+    }
+    return -1;
   }
 }
 ?>

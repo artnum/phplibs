@@ -34,6 +34,7 @@ class Response {
     $this->headers = [];
     $this->first = true;
     $this->code = 200;
+    $this->hasPartialData = false;
   }
 
   function stop_output() {
@@ -44,6 +45,7 @@ class Response {
   function echo ($txt) {
     try {
       echo $txt;
+      $this->hasPartialData = true;
     } catch (Exception $e) {
       error_log($e->getMessage());
     }
@@ -55,6 +57,7 @@ class Response {
       $this->first = false;
       echo json_encode($json);
       ob_flush();
+      $this->hasPartialData = true;
     } catch (Exception $e) {
       error_log($e->getMessage());
     }
@@ -71,6 +74,10 @@ class Response {
       header($header, true);
     }
     ob_flush();
+  }
+
+  function isOutputClean() {
+    return !$this->hasPartialData;
   }
 
   function code($num) {
