@@ -32,6 +32,8 @@ class LDAP extends \artnum\JStore\OP {
   protected $base;
   protected $Config;
   protected $Attribute;
+  protected $attributeFilteringActive;
+  protected $filterAttributes;
 
   function __construct($db, $base = NULL, $attributes = NULL, $config = NULL) {
     $this->DB = $db;
@@ -39,6 +41,7 @@ class LDAP extends \artnum\JStore\OP {
     $this->Config = $config;
     $this->Binary = [];
     $this->filterAttributes = [];
+    $this->attributeFilteringActive = false;
     
     if(isset($this->Config['binary']) && is_array($this->Config['binary'])) {
       foreach($this->Config['binary'] as $b) {
@@ -58,7 +61,19 @@ class LDAP extends \artnum\JStore\OP {
 
 
   function setAttributeFilter($attributes = []) {
+    if (empty($attributes)) { return; }
+    $this->attributeFilteringActive = true;
     $this->filterAttributes = $attributes;
+    array_map('strtolower', $this->filterAttributes);
+    if (!in_array('objectclass', $attributes)) {
+      $this->filterAttributes[] = 'objectclass';
+    }
+    if (!in_array('IDent', $attributes)) {
+      $this->filterAttributes[] = 'IDent';
+    }
+    if ($this->conf('rdnAttr') && !in_array($this->conf('rdnAttr'), $this->filterAttributes)) {
+      $this->filterAttributes[] = strtolower($this->conf('rdnAttr'));
+    }
   }
 
   function dbtype() {
@@ -417,7 +432,7 @@ class LDAP extends \artnum\JStore\OP {
       $attr !== FALSE;
       $attr = ldap_next_attribute($conn, $ldapEntry, $_ber)
     ) {
-      if (in_array($attr, $this->filterAttributes)) { continue; }
+      if ($this->attributeFilteringActive && !in_array(strtolower($attr), $this->filterAttributes)) { continue; }
       $attr = strtolower($attr);
       $checkAttr = $attr;
       $options = null;
@@ -556,6 +571,13 @@ class LDAP extends \artnum\JStore\OP {
     $attrsToBuild = $this->conf('toBuild');
     if (!$attrsToBuild) { $attrsToBuild = array(); }
     
+    if ($this->attributeFilteringActive) {
+      $keys = array_keys($data);
+      foreach($keys as $key) {
+        if (!in_array($key, $this->filterAttributes)) { unset($data[$key]); }
+      }
+    }
+
     if (isset($data['IDent'])) {
       $ident = rawurldecode($data['IDent']);
       $id = $ident;
@@ -628,7 +650,7 @@ class LDAP extends \artnum\JStore\OP {
         if ($r === false) { $fullSuccess = false; }
       }
       $this->response->start_output();
-      $this->repsonse->print(['IDent' => $ident, 'success' => $fullSuccess, 'op' => 'edit', 'details' => $modResults]);
+      $this->response->print(['IDent' => $ident, 'success' => $fullSuccess, 'op' => 'edit', 'details' => $modResults]);
       return ['count' => 1, 'id' => $ident];
     } else {
       $rdnVal = $this->getRdnValue($data);
@@ -667,6 +689,7 @@ class LDAP extends \artnum\JStore\OP {
         }
         $entry[$k] = array($value);
       }
+
       if (@ldap_add($conn, $dn, $entry)) {
         $dn = ldap_explode_dn($dn, 0);
         $ident = rawurlencode($dn[0]);

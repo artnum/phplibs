@@ -34,6 +34,8 @@ class SQL extends \artnum\JStore\OP {
   protected $DB;
   protected $Table;
   protected $IDName;
+  protected $attributeFilteringActive;
+  protected $filterAttributes;
   protected $Request = array(
      'delete' => 'DELETE FROM "\\Table" WHERE "\\IDName" = :id',
      'get' => 'SELECT * FROM "\\Table"',
@@ -62,10 +64,18 @@ class SQL extends \artnum\JStore\OP {
     $this->conf('IDName', $id_name);
     $this->DataLayer = new Data();
     $this->filterAttributes = [];
+    $this->attributeFilteringActive = false;
   }
 
   function setAttributeFilter($attributes = []) {
+    if (empty($attributes)) { return; }
+
+    $this->attributeFilteringActive = true;
     $this->filterAttributes = $attributes;
+    $id = array_pop(explode('_', $this->conf('IDName')));
+    if (!in_array($id, $this->filterAttributes)) {
+      $this->filterAttributes[] = $id;
+    }
   }
 
   function add_db($db, $readonly = false) {
@@ -588,7 +598,7 @@ class SQL extends \artnum\JStore\OP {
     foreach($entry as $k => $v) {
       $s = explode('_', $k, 2);
       if(count($s) <= 1) {
-        if (in_array($k, $this->filterAttributes)) { continue; }
+        if ($this->attributeFilteringActive && !in_array($k, $this->filterAttributes)) { continue; }
         $unprefixed[$k] = $v;
       } else {
         /* if the prefix is from a different table, it means we are onto join request (or alike), so create subcategory */
@@ -605,7 +615,7 @@ class SQL extends \artnum\JStore\OP {
           }
           $unprefixed['_' . $s[0]][$s[1]] = $v;
         } else {
-          if (in_array($s[1], $this->filterAttributes)) { continue; }
+          if ($this->attributeFilteringActive && !in_array($s[1], $this->filterAttributes)) { continue; }
           $unprefixed[$s[1]] = $v;
         }
       }
@@ -853,6 +863,13 @@ class SQL extends \artnum\JStore\OP {
     $prefixed = array();
     $ignored = is_array($this->conf('ignored')) ? $this->conf('ignored') : array();
 
+    if ($this->attributeFilteringActive) {
+      $keys = array_keys($data);
+      foreach($keys as $key) {
+        if (!in_array($key, $this->filterAttributes)) { unset($data[$key]); }
+      }
+    }
+
     foreach($data as $k => $v) {
       if (in_array($k, $ignored)) {
         continue;
@@ -911,7 +928,6 @@ class SQL extends \artnum\JStore\OP {
         $stmt->bindValue(':id', $id, \PDO::PARAM_INT);
         $stmt->execute();
         $row = $stmt->fetch(\PDO::FETCH_NUM);
-        error_log('Owner for project ' . $row[0]);
         return $row[0];
       } catch (Exception $e) {
         return null;

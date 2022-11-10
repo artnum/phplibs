@@ -213,7 +213,10 @@ class Generic {
 
   function run() {
     $response = $this->response;
-  
+    if ($this->acl) {
+      $this->model->setAttributeFilter($this->acl->getCurrentAttributesFilter());
+    }
+
     if (substr($this->request->getCollection(), 0, 1) == '.') {
       $ret = $this->internal($response);
       return $ret;
