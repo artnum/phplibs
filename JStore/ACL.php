@@ -43,62 +43,39 @@ class ACL {
     function __construct($groups) {
         $this->rules = [];
         $this->groups = $groups;
-        $this->current_rule =['who' => -1, 'what' => '*', 'isGroup' => true, 'access' => self::LEVEL_NONE, 'attributes' => ['*']];
+        $this->current_rule = ['collection' => '*', 'who' => -1, 'what' => self::LEVEL_NONE, 'isGroup' => true, 'access' => self::ANY, 'attributes' => ['*']];
+    }
+
+    function getCurrentAttributesFilter () {
+        $filter = $this->current_rule['attributes'];
+        if (in_array('*', $filter)) { return []; }
+        return $filter;
     }
 
     function addRule($collection, $who, $what = self::LEVEL_NONE, $isGroup = false, $access = self::ANY, $attributes = ['*']) {
-        if (empty($this->rules[$collection])) {
-            $this->rules[$collection] = [];
-        }
-        $this->rules[$collection][] = ['who' => $who, 'what' => $what, 'isGroup' => $isGroup, 'access' => $access, 'attributes' => $attributes];
+        $this->rules[] = ['collection' => $collection, 'who' => $who, 'what' => $what, 'isGroup' => $isGroup, 'access' => $access, 'attributes' => $attributes];
     }
 
-    function matchRule ($rule, $who, $what) {
+    function matchRule ($rule, $collection, $who, $what) {
         if ($rule['isGroup']) {
-            if ($this->isMember($who, $rule['who']) && ($what <= $rule['what'])) { return true; }
+            if (
+                $this->isMember($who, $rule['who']) && 
+                ($what <= $rule['what']) &&
+                ($collection === $rule['collection'] || $rule['collection'] === '*')
+            ) 
+                { return true; }
         }
-        if ($rule['who'] === $who && ($what <= $rule['what'])) { return true; }
+        if (
+            $rule['who'] === $who && 
+            ($what <= $rule['what']) &&
+            ($collection === $rule['collection'] || $rule['collection'] === '*')
+        ) { return true; }
         return false;
     }
 
-    function filterData ($data) {
-      //  error_log(var_export($this->current_rule, true));
-        //if ($this->current_rule['access'] < self::LEVEL_AUTH) { return []; }
-        error_log(var_export($this->current_rule, true));
-
-        if (in_array('*', $this->current_rule['attributes'])) { return $data; }
-
-        error_log(var_export($data, true));
-        foreach (array_keys($data) as $key) {
-            if (!in_array($key, $this->current_rule['attributes'])) {
-                unset($data[$key]);
-            }
-        }
-        return $data;
-    }
-
     function check ($collection, $who, $what, $owner = null) {
-        // any collection
-        if (!empty($this->rules['*'])) {
-            foreach ($this->rules['*'] as $rule) {
-                if($this->matchRule($rule, $who, $what)) {
-                    if (
-                        $owner !== null && 
-                        $rule['access'] === self::SELF &&
-                        $owner !== -1 && // owner -1 is everyone owner 
-                        $who !== $owner
-                    ) {
-                        $this->current_rule = $rule;
-                        return false;
-                    }
-                    $this->current_rule = $rule;
-                    return $rule['access'] > 0;
-                }
-            }
-        }
-        if (empty($this->rules[$collection])) { return false; }
-        foreach ($this->rules[$collection] as $rule) {
-            if ($this->matchRule($rule, $who, $what)) {
+        foreach ($this->rules as $rule) {
+            if ($this->matchRule($rule, $collection, $who, $what)) {
                 if (
                     $owner !== null && 
                     $rule['access'] === self::SELF &&
