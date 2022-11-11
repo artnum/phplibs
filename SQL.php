@@ -928,6 +928,7 @@ class SQL extends \artnum\JStore\OP {
         $stmt->bindValue(':id', $id, \PDO::PARAM_INT);
         $stmt->execute();
         $row = $stmt->fetch(\PDO::FETCH_NUM);
+        if (!$row) { throw new Exception('null'); }
         return $row[0];
       } catch (Exception $e) {
         return null;
