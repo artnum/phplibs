@@ -76,12 +76,19 @@ class JRestClient {
          $urls[] = $url;
       }
      
+      $c = null;
       if(\is_null($collection)) {
          if(!\is_null($this->collection)) {
-            $urls[] = \rawurlencode($this->collection);
+            $c = $this->collection;
          }
       } else {
-         $urls[] = \rawurlencode($collection);
+         $c = $collection;
+      }
+      if ($c) {
+         $c = explode('/', $c);
+         foreach ($c as $_c) {
+            $urls[] = \rawurlencode($_c);
+         }
       }
 
       if(!empty($elements)) {
