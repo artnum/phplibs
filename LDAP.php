@@ -59,6 +59,15 @@ class LDAP extends \artnum\JStore\OP {
     }
   }
 
+  function getIDName() {
+    return 'IDent';
+  }
+  
+  function getOptions() {
+    $options = [];
+    if (is_callable($this, 'restore')) { $options[] = 'restore'; }
+    return $options;
+  }
 
   function setAttributeFilter($attributes = []) {
     if (empty($attributes)) { return; }
@@ -133,6 +142,7 @@ class LDAP extends \artnum\JStore\OP {
   function _read($dn) {
     $c = $this->DB->readable();
     $dn = rawurldecode($dn);
+    $this->response->setItemId($dn);
     $res = @ldap_read($c, $this->_dn($dn), '(objectclass=*)', $this->Attribute ?? ['*']);
     if (!$res) { 
       switch (ldap_errno($c)) {
@@ -155,6 +165,7 @@ class LDAP extends \artnum\JStore\OP {
 
   function _delete($dn) {
     $result = ['count' => 0, 'id' => $dn];
+    $this->response->setItemId($dn);
     $c = $this->DB->writable();
     if($this->exists($dn)) {
       if (ldap_delete($c, $this->_dn($dn))) {
@@ -167,6 +178,7 @@ class LDAP extends \artnum\JStore\OP {
 
   function _exists($dn) {
     $c = $this->DB->readable();
+    $this->response->setItemId($dn);
     $res = ldap_read($c, $this->_dn($dn), '(objectclass=*)', array('dn'));
     if($res && ldap_count_entries($c, $res) == 1) {
       return TRUE;
@@ -581,6 +593,7 @@ class LDAP extends \artnum\JStore\OP {
     if (isset($data['IDent'])) {
       $ident = rawurldecode($data['IDent']);
       $id = $ident;
+      $this->response->setItemId($id);
       $entry = $this->get($ident, $conn);
       if ($entry === NULL) { throw new Exception('Unknown entry'); }
       $dn = ldap_get_dn($conn, $entry);
@@ -655,6 +668,7 @@ class LDAP extends \artnum\JStore\OP {
     } else {
       $rdnVal = $this->getRdnValue($data);
       $id = $rdnVal;
+      $this->response->setItemId($id);
       $dn = $this->buildDn($rdnVal);
       if (is_callable($this->conf('objectclass'))) {
         $entry = ['objectclass' => $this->conf('objectclass')($data), $this->conf('rdnAttr') => array($rdnVal)];

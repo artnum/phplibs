@@ -36,14 +36,32 @@ class Response {
     $this->code = 200;
     $this->hasPartialData = false;
     $this->headerSent = false;
+    $this->closed = false;
+    $this->error = false;
+    $this->itemId = -1;
+  }
+
+  function setItemId($id) {
+    $this->itemId = $id;
+  }
+
+  function getItemId() {
+    return $this->itemId;
+  }
+
+  function output() {
+    $this->start_output();
+    $this->stop_output();
   }
 
   function stop_output() {
+    $this->closed = true;
     ob_end_flush();
     flush();
   }
 
   function echo ($txt) {
+    if ($this->closed) { return; }
     try {
       echo $txt;
       $this->hasPartialData = true;
@@ -53,6 +71,7 @@ class Response {
   }
 
   function print($json) {
+    if ($this->closed) { return; }
     try {
       if (!$this->first) { echo ',';}
       $this->first = false;
@@ -65,11 +84,13 @@ class Response {
   }
 
   function clear_output() {
+    if ($this->closed) { return; }
     ob_clean();
   }
 
   function start_output () {
     if ($this->output_started) { return; }
+    if ($this->closed) { return; }
     if (!$this->headerSent) {
       http_response_code($this->code);
       foreach ($this->headers as $header) {
@@ -85,10 +106,17 @@ class Response {
   }
 
   function code($num) {
+    if ($this->closed) { return; }
     $this->code = $num;
   }
 
+  function succeed () {
+    return $this->error === false && $this->code === 200;
+  }
+
   function error($message, $code = 500) {
+    $this->error = true;
+    if ($this->closed) { return; }
     ob_end_clean();
     http_response_code($code);
     foreach ($this->headers as $header) {
@@ -107,6 +135,7 @@ class Response {
   }
 
   function header($name, $value, $replace = true) {
+    if ($this->closed) { return; }
     $key = strtolower($name);
     if ($replace) {
       $this->headers[$key] = sprintf('%s: %s', $name, $value);

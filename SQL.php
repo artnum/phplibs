@@ -67,6 +67,17 @@ class SQL extends \artnum\JStore\OP {
     $this->attributeFilteringActive = false;
   }
 
+  function getIDName() {
+    $idname = explode('_', $this->IDName);
+    return array_pop($idname);
+  }
+
+  function getOptions() {
+    $options = [];
+    if (is_callable($this, 'restore')) { $options[] = 'restore'; }
+    return $options;
+  }
+
   function setAttributeFilter($attributes = []) {
     if (empty($attributes)) { return; }
 
@@ -154,6 +165,7 @@ class SQL extends \artnum\JStore\OP {
 
   function _delete($id) {
     $result = ['count' => 0, 'id' => $id];
+    $this->response->setItemId($id);
     if (!$this->conf('delete')) {
       $st = $this->get_db(false)->prepare($this->req('delete'));
       $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
@@ -659,7 +671,9 @@ class SQL extends \artnum\JStore\OP {
     $params = [];
     $count = 0;
 
-    $statement .= ' WHERE ' . $this->query($body, $params, $count);
+    if (!empty($body)) {
+      $statement .= ' WHERE ' . $this->query($body, $params, $count);
+    }
     if(! empty($options['sort'])) {
       $statement .= ' ' . $this->prepareSort($options['sort']);
     }
@@ -804,9 +818,11 @@ class SQL extends \artnum\JStore\OP {
     
     if($this->conf('auto-increment')) {
       $idx = $db->lastInsertId($this->IDName);
+      $this->response->setItemId($idx);
       $db->commit();
       return $idx;
     } else {
+      $this->response->setItemId($data[$this->IDName]);
       return $data[$this->IDName];
     }
   }
@@ -839,6 +855,7 @@ class SQL extends \artnum\JStore\OP {
     }
     $bind_type = ctype_digit($id) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
     $st->bindParam(':' . $this->IDName, $id, $bind_type);
+    $this->response->setItemId($id);
     $ex = $st->execute();
     if(! $ex) {
       throw new Exception('Update failed');
