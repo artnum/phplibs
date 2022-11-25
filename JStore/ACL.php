@@ -32,13 +32,14 @@ class ACL {
     const NONE = 0;
 
     const LEVEL_NONE = 0;
-    const LEVEL_AUTH = 8;
-    const LEVEL_SEARCH = 16;
-    const LEVEL_READ = 32;
-    const LEVEL_UPDATE = 64;
-    const LEVEL_CREATE = 128;
-    const LEVEL_DELETE = 256;
-    const LEVEL_ANY = 512;
+    const LEVEL_AUTH = 1;
+    const LEVEL_SEARCH = 2;
+    const LEVEL_READ = 4;
+    const LEVEL_UPDATE = 8;
+    const LEVEL_CREATE = 16;
+    const LEVEL_DELETE = 32;
+    const LEVEL_IMPERSONATE = 2048;
+    const LEVEL_ANY = 32768;
 
     function __construct($groups) {
         $this->rules = [];
