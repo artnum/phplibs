@@ -37,25 +37,42 @@ class HTTP extends \artnum\HTTP\CORS
     $this->response = $response;
   }
 
+  function optionsAction() {
+    $this->response->clear_output();
+    parent::optionsAction();
+    $this->response->start_output();
+    $body = ['options' => []];
+    if (method_exists($this->Model, 'getOptions')) {
+      $body['options'] = $this->Model->getOptions();
+    }
+    $this->response->print($body);
+    $this->response->stop_output();
+    return ['count' => 0];
+  }
+
   function headAction($req) {
     $this->response->clear_output();
     $this->setCorsHeaders();
     try {
       if($req->onCollection()) {
-        $this->response->header('X-Artnum-Last-Id', method_exists($this->Model, 'getLastId') ? $this->Model->getLastId($req->getParameters()) : -1);
-        $this->response->header('X-Artnum-Last-Modification', method_exists($this->Model, 'getTableLastMod') ? $this->Model->getTableLastMod() : -1);
+        $this->response->header('JSTORE-Last-Id', method_exists($this->Model, 'getLastId') ? $this->Model->getLastId($req->getParameters()) : -1);
+        $this->response->header('JSTORE-Last-Modification', method_exists($this->Model, 'getTableLastMod') ? $this->Model->getTableLastMod() : -1);
       } else if($req->onItem()) {
         if($this->Model->exists($req->getItem())) {
-          $this->response->header('X-Artnum-Last-Modification', method_exists($this->Model, 'getLastMod') ? $this->Model->getLastMod($req->getItem()) : -1);
-          $this->response->header('X-Artnum-Deleted', method_exists($this->Model, 'getDeleteDate') ? $this->Model->getDeleteDate($req->getItem()) : -1);
-          $this->response->header('X-Artnum-Exists', 1);
+          $this->response->header('JSTORE-Last-Modification', method_exists($this->Model, 'getLastMod') ? $this->Model->getLastMod($req->getItem()) : -1);
+          $this->response->header('JSTORE-Deleted', method_exists($this->Model, 'getDeleteDate') ? $this->Model->getDeleteDate($req->getItem()) : -1);
+          $this->response->header('JSTORE-Exists', 1);
         } else {
-          $this->response->header('X-Artnum-Error', 'Does not exist');
-          $this->response->header('X-Artnum-Exists', 0);
+          $this->response->code(404);
+          $this->response->header('JSTORE-Error', 'Does not exist');
+          $this->response->header('JSTORE-Exists', 0);
         }
       }
     } catch(\Exception $e) {
-      $this->response->header('X-Artnum-Error', $e->getMessage());
+      $this->response->header('JSTORE-Error', $e->getMessage());
+    } finally {
+      $this->response->output();
+      return ['count' => 0];
     }
   }
 
@@ -64,6 +81,7 @@ class HTTP extends \artnum\HTTP\CORS
       case 'POST':
         if ($req->onCollection()) { return ACL::LEVEL_CREATE; }
         if ($req->onItem() && $req->getItem() === '_query') { return ACL::LEVEL_SEARCH; }
+        if ($req->onItem() && $req->getItem() === '_restore') { return ACL::LEVEL_CREATE; }
         if ($req->onItem()) { return ACL::LEVEL_UPDATE; }
         return ACL::LEVEL_CREATE;
       case 'PUT': // fall through
@@ -77,6 +95,8 @@ class HTTP extends \artnum\HTTP\CORS
         return ACL::LEVEL_READ;
       case 'HEAD':
         return ACL::LEVEL_READ;
+      case 'OPTIONS':
+        return ACL::LEVEL_ANY;
     }
   }
 
@@ -126,10 +146,14 @@ class HTTP extends \artnum\HTTP\CORS
           return $this->Model->search($req->getParameters());
         case '_query': 
           if (!is_callable([$this->Model, 'query'])) { 
-            throw new Exception('Not available');
+            throw new Exception('Not available', 501);
           }
-
           return $this->Model->search($req->getBody(), $req->getParameters());
+        case '_restore':
+          if (!is_callable([$this->Model, 'restore'])) {
+            throw new Exception('Not available', 501);
+          }
+          return $this->Model->restore($req->getBody(), $req->getParameters());
         default: 
           if (substr($item, 0, 1) === '.') {
             $method = 'get' . ucfirst(strtolower(substr($item, 1)));
