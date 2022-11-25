@@ -245,18 +245,15 @@ class Generic {
       $action = strtolower($this->request->getVerb()) . 'Action';
       $results = $this->controller->$action($this->request);
 
-      /*if (!empty($this->model->getOperation()[0])) {
-        error_log(sprintf('%d, %s: %s/%s' , time(), $this->model->getOperation()[0], $this->collection, $this->model->getOperation()[1]));
-      }*/
-
       $reqId = $this->request->getClientReqId();
       if (!$reqId) {
         $reqId = '';
       }
       
       $response->echo(
-        sprintf('],"success":true,"type":"results","store":"%s","message":"OK","length":%d}',
+        sprintf('],"success":true,"type":"results","store":"%s","idname":"%s","message":"OK","length":%d}',
           $this->request->getCollection(),
+          $this->model->getIDName(),
           $results['count'])
       );
       $response->stop_output();
@@ -278,6 +275,8 @@ class Generic {
       }
     } catch(Exception $e) {
       $this->fail($response, $e->getMessage());
+    } finally {
+      return [$this->request, $response];
     }
   }
 
