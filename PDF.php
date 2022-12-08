@@ -670,6 +670,8 @@ class PDF extends \tFPDF {
         $this->SetX($this->GetX() + $options['max-width']);
       }
       foreach($txt as $t) {
+        $t = strval($t);
+        if (empty($t)) { continue; }
         if ($t[0] == '%') {
           if (isset($this->tagged_fonts[substr($t, 1)])) {
             $this->setTaggedFont(substr($t, 1));
@@ -684,6 +686,7 @@ class PDF extends \tFPDF {
       }
     } else {
       foreach($txt as $t) {
+        $t = strval($t);
         if (empty($t)) { continue; }
         if($t[0] == '%') {
           if(isset($this->tagged_fonts[substr($t, 1)])) {

@@ -436,13 +436,12 @@ class LDAP extends \artnum\JStore\OP {
     $attributes = $this->Attribute;
     if (!is_array($attributes)) { $attributes = null; }
     $entry = array();
-    $_ber = NULL;
     $dn = ldap_explode_dn(ldap_get_dn($conn, $ldapEntry), 0);
     $entry['IDent'] = rawurlencode($dn[0]);
     for (
-      $attr = ldap_first_attribute($conn, $ldapEntry, $_ber);
+      $attr = ldap_first_attribute($conn, $ldapEntry);
       $attr !== FALSE;
-      $attr = ldap_next_attribute($conn, $ldapEntry, $_ber)
+      $attr = ldap_next_attribute($conn, $ldapEntry)
     ) {
       if ($this->attributeFilteringActive && !in_array(strtolower($attr), $this->filterAttributes)) { continue; }
       $attr = strtolower($attr);
