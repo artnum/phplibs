@@ -216,10 +216,10 @@ class JRestClient {
          return $this->getCollection($collection);
       }
 
-      $query_elements = array();
+      $query_elements = [];
       foreach($search as $k => $v) {
-         if(\is_string($v)) {
-            $query_elements[] = \urlencode($k) . '=' . \urlencode($v);
+         if(!is_array($v)) {
+            $query_elements[] = \urlencode($k) . '=' . \urlencode(strval($v));
          } else if(is_array($v)) {
             foreach($v as $_v) {
                $query_elements[] = \urlencode($k) . '=' . \urlencode($_v);

@@ -28,6 +28,16 @@ Namespace artnum\JStore;
 use \Exception;
 
 class Response {
+  protected $output_started;
+  protected $headers;
+  protected $first;
+  protected $code;
+  protected $hasPartialData;
+  protected $headerSent;
+  protected $closed;
+  protected $error;
+  protected $itemId;
+
   function __construct() {
     ob_start();
     $this->output_started = false;
@@ -56,7 +66,7 @@ class Response {
 
   function stop_output() {
     $this->closed = true;
-    ob_end_flush();
+    if (ob_get_status()) { ob_end_flush(); }
     flush();
   }
 
@@ -77,6 +87,7 @@ class Response {
       $this->first = false;
       echo json_encode($json);
       ob_flush();
+      flush();
       $this->hasPartialData = true;
     } catch (Exception $e) {
       error_log($e->getMessage());

@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2018-2022 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2018-2023 Etienne Bagnoud <etienne@artisan-numerique.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,13 @@ class Generic {
   protected $lockManager;
   protected $data;
   protected $postprocessFunctions = [];
+  protected $collection;
+  protected $user = -1;
+  protected $model = null;
+  protected $controller = null;
+  protected $acl = null;
+  protected $response;
+  protected $etag = null;
   
   function __construct($http_request = NULL, $dont_run = false, $options = []) {
     $this->dbs = [];
@@ -79,6 +86,10 @@ class Generic {
     }
 
     $this->dbs[$type][] = $db;
+  }
+
+  function setEtag ($etag) {
+    $this->etag = $etag;
   }
 
   function set($name, $value) {
@@ -191,6 +202,13 @@ class Generic {
     $this->acl = $acl;
   }
 
+  function setEtagOnCollection ($url) {
+    $parts = explode('/', $url);
+    array_pop($parts);
+    $url = join('/', $parts);
+    $this->etag->set($url);
+  }
+
 
   function init($conf = null) {
     /* run user code */
@@ -240,16 +258,24 @@ class Generic {
       }
       
       $response->header('Content-Type', 'application/json');
-      $response->echo('{"data":[');
-      $results = array('success' => false, 'type' => 'results', 'data' => null, 'length' => 0);
       $action = strtolower($this->request->getVerb()) . 'Action';
-      $results = $this->controller->$action($this->request);
-
-      $reqId = $this->request->getClientReqId();
-      if (!$reqId) {
-        $reqId = '';
+      if ($this->etag) {
+        switch ($action) {
+          case 'headAction':
+          case 'getAction':
+            if ($this->request->onItem() && strpos($this->request->getItem(), '.') === 0) { break; }
+            $etag = $this->etag->get($this->request->getUrl());
+            if (empty($etag)){ 
+              $etag = $this->etag->set($this->request->getUrl());
+            }
+            error_log('ETAG ' . $etag );
+            $response->header('ETag', '"' . $etag . '"');
+            break;
+        }
       }
-      
+
+      $response->echo('{"data":[');
+      $results = $this->controller->$action($this->request);
       $response->echo(
         sprintf('],"success":true,"type":"results","store":"%s","idname":"%s","message":"OK","length":%d}',
           $this->request->getCollection(),
@@ -258,22 +284,28 @@ class Generic {
       );
       $response->stop_output();
 
-      $this->postprocess();
-      if (isset($results['result'])) {
-        if ($results['result']->countError() > 0) {
-          foreach ($results['result']->getError() as $error) {
-            error_log(sprintf('%d ReqID[%s]/%s/%s@%s:%s +%s+',
-                              $error['time'],
-                              $reqId,
-                              $this->request->url_elements[0],
-                              isset($this->request->url_elements[1]) ? $this->request->url_elements[1] : '',
-                              $error['file'],
-                              $error['line'],
-                              addslashes($error['message'])), 0);
-          }
+      if ($this->etag) {
+        switch($action) {
+          case 'postAction': 
+            if ($this->request->onCollection()) { $this->etag->set($this->request->getUrl()); }
+            break;
+          case 'putAction':
+          case 'patchAction':
+            // put action can be used as post so it changes the collection itself
+            if ($this->request->onCollection()) { $this->etag->set($this->request->getUrl()); break; }
+            $this->etag->set($this->request->getUrl());
+            $this->setEtagOnCollection($this->request->getUrl());
+            break;
+          case 'deleteAction':
+            if ($this->request->onCollection()) { break; }
+            $this->etag->delete($this->request->getUrl());
+            $this->setEtagOnCollection($this->request->getUrl());
         }
       }
-    } catch(Exception $e) {
+
+      $this->postprocess();
+    } catch(\Exception $e) {
+      error_log($e->getMessage());
       $this->fail($response, $e->getMessage());
     } finally {
       return [$this->request, $response];
@@ -281,7 +313,7 @@ class Generic {
   }
 
   function fail($response, $message, $code = 500) {
-    if ($message instanceof Exception) {
+    if ($message instanceof \Exception) {
         $c = $message->getCode();
         if ($c !== 0) { $code = $c; }
         $message = $message->getMessage();

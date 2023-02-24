@@ -36,6 +36,9 @@ class JsonRequest extends Path
   public $items;
   public $http_headers = array();
   public $clientReqId = null;
+  public $body = null;
+  public $url = '';
+  public $contentHash = null;
 
   function __construct()
   {
@@ -55,6 +58,7 @@ class JsonRequest extends Path
     $this->verb = $_SERVER['REQUEST_METHOD'];
     $this->protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
     $this->client = $_SERVER['REMOTE_ADDR'];
+    $this->url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
 
     $this->parseParams();
 
@@ -76,6 +80,14 @@ class JsonRequest extends Path
         $this->http_headers[$k] = $v;
       }
     }
+  }
+
+  function getContentHash() {
+    return $this->contentHash;
+  }
+
+  function getUrl() {
+    return $this->url;
   }
 
   function getId() {
@@ -236,8 +248,18 @@ class JsonRequest extends Path
       $params = $this->_parse_str($_SERVER['QUERY_STRING']);
     }
 
+    if ($this->verb === 'HEAD') {
+      $this->parameters = $params;
+      return;
+    }
+
     $content = file_get_contents('php://input');
+    $this->contentHash = sha1($content);
     if($content !== FALSE) {
+      if (strlen($content) === 0) {
+        $this->parameters = $params;
+        return;
+      }
       if(isset($_SERVER['CONTENT_TYPE']) && strcmp($_SERVER['CONTENT_TYPE'], "application/x-www-form-urlencoded") == 0) {
         $body = [];
         foreach($this->_parse_str($content) as $_k => $_v) {

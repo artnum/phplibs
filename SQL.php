@@ -36,6 +36,14 @@ class SQL extends \artnum\JStore\OP {
   protected $IDName;
   protected $attributeFilteringActive;
   protected $filterAttributes;
+  protected $RODB;
+  protected $RRobin;
+  protected $WRRobin;
+  protected $DataLayer;
+  protected $response;
+  protected $doExtend = false;
+  protected $doPostprocess = false;
+
   protected $Request = array(
      'delete' => 'DELETE FROM "\\Table" WHERE "\\IDName" = :id',
      'get' => 'SELECT * FROM "\\Table"',
@@ -65,6 +73,13 @@ class SQL extends \artnum\JStore\OP {
     $this->DataLayer = new Data();
     $this->filterAttributes = [];
     $this->attributeFilteringActive = false;
+
+    if (method_exists($this, 'extendEntry')) {
+      $this->doExtend = true;
+    }
+    if (method_exists($this, '_postprocess')) {
+      $this->doPostprocess = true;
+    }
   }
 
   function getIDName() {
@@ -74,7 +89,7 @@ class SQL extends \artnum\JStore\OP {
 
   function getOptions() {
     $options = [];
-    if (is_callable($this, 'restore')) { $options[] = 'restore'; }
+    if (method_exists($this, 'restore')) { $options[] = 'restore'; }
     return $options;
   }
 
@@ -600,71 +615,49 @@ class SQL extends \artnum\JStore\OP {
     return array(NULL, 0);
   }
 
-  function unprefix($entry, $table = NULL) {
+  function unprefix(&$entry, $table = NULL) {
     $nullTable = array();
     $useTable = $this->conf('Table');
     if (!is_null($table)) {
       $useTable = $table;
     }
-    $unprefixed = array();
+
     foreach($entry as $k => $v) {
       $s = explode('_', $k, 2);
       if(count($s) <= 1) {
-        if ($this->attributeFilteringActive && !in_array($k, $this->filterAttributes)) { continue; }
-        $unprefixed[$k] = $v;
-      } else {
-        /* if the prefix is from a different table, it means we are onto join request (or alike), so create subcategory */
-        if (strcasecmp($s[0], $useTable) != 0) {
-          if (!isset($nullTable['_' . $s[0]])) {
-            $nullTable['_' . $s[0]] = true;
-          }
-          if (!isset($unprefixed['_' . $s[0]])) {
-            $unprefixed['_' . $s[0]] = array();
-          }
-
-          if (!is_null($v)) {
-            $nullTable['_' . $s[0]] = false;
-          }
-          $unprefixed['_' . $s[0]][$s[1]] = $v;
-        } else {
-          if ($this->attributeFilteringActive && !in_array($s[1], $this->filterAttributes)) { continue; }
-          $unprefixed[$s[1]] = $v;
-        }
+        if ($this->attributeFilteringActive && !in_array($k, $this->filterAttributes)) { unset($entry[$k]); continue; }
       }
+      
+      /* if the prefix is from a different table, it means we are onto join request (or alike), so create subcategory */
+      if (strcasecmp($s[0], $useTable) != 0) {
+        if (empty($s[1])) { continue; }
+        unset($entry[$k]);
+        if (!isset($nullTable['_' . $s[0]])) {
+          $nullTable['_' . $s[0]] = true;
+        }
+        if (!isset($entry['_' . $s[0]])) {
+          $entry['_' . $s[0]] = array();
+        }
+
+        if (!is_null($v)) {
+          $nullTable['_' . $s[0]] = false;
+        }
+        $entry['_' . $s[0]][$s[1]] = $v;
+        continue;
+      }
+      unset($entry[$k]); 
+      if ($this->attributeFilteringActive && !in_array($s[1], $this->filterAttributes)) { continue; }
+      $entry[$s[1]] = $v;  
     }
 
     foreach($nullTable as $k => $v) {
       if ($v) {
-        $unprefixed[$k] = null;
-      }
-    }
-    return $unprefixed;
-  }
-
-  function _postprocess ($entry) {
-    $dt = $this->conf('datetime');
-    $private = $this->conf('private') ? $this->conf('private') : array();
-    foreach ($entry as $k => $v) {
-      if ($this->conf('postprocess') && is_callable($this->conf('postprocess'))) {
-        $entry[$k] = \call_user_func($this->conf('postprocess'), $k, $v);
-      }
-      if (in_array($k, $private)) {
         $entry[$k] = null;
-        unset ($entry[$k]);
-        continue;
-      }
-      if (is_array($dt) && in_array($k, $dt)) {
-        $entry[$k] = $this->DataLayer->datetime($v);
       }
     }
-
-    return $entry;
+    //return $unprefixed;
   }
 
-  function extendEntry ($entry, &$result) {
-    return $entry;
-  }
-  
   function search($body, $options) {
     $results = ['count' => 0];
     $statement = $this->req('get');
@@ -700,15 +693,12 @@ class SQL extends \artnum\JStore\OP {
       throw new Exception($st->errorInfo()[2]);
     }
 
-    $ids = [];
     $this->response->start_output();
     while ($row = $st->fetch(\PDO::FETCH_ASSOC)) {
-      if (in_array($row[$this->IDName], $ids)) { continue; }
-      $ids[] = $row[$this->IDName];
-      $row = $this->unprefix($row);
+      $this->unprefix($row);
       if (empty($row)) { continue; }
-      $row = $this->_postprocess($row);
-      $row = $this->extendEntry($row, $result);
+      if ($this->doPostprocess) { $row = $this->_postprocess($row); }
+      if($this->doExtend) { $row = $this->extendEntry($row, $results); }
       $this->response->print($row);
       $results['count']++;
     }
@@ -717,7 +707,6 @@ class SQL extends \artnum\JStore\OP {
 
   function listing($options) {
     $result = ['count' => 0];
-    $ids = [];
     $pre_statement = $this->prepare_statement($this->req('get'), $options);
     $st = $this->get_db(true)->prepare($pre_statement);
 
@@ -727,12 +716,10 @@ class SQL extends \artnum\JStore\OP {
 
     $this->response->start_output();
     while ($data = $st->fetch(\PDO::FETCH_ASSOC)) {
-      if (in_array($data[$this->IDName], $ids)) { continue; }
-      $ids[] = $data[$this->IDName];
-      $data = $this->unprefix($data);
+      $this->unprefix($data);
       if (empty($data)) { continue; }
-      $data = $this->_postprocess($data);
-      $data = $this->extendEntry($data, $result);
+      if ($this->doPostprocess) { $data = $this->_postprocess($data); }
+      if ($this->doExtend) { $data = $this->extendEntry($data, $result); }
       $this->response->print($data);
       $result['count']++;
     }
@@ -911,7 +898,7 @@ class SQL extends \artnum\JStore\OP {
       }
     }
 
-    if(empty($prefixed[$this->IDName])) {
+     if(empty($prefixed[$this->IDName])) {
       if (!is_null($this->conf('create'))) {
         if (!$this->conf('create.ts')) {
           $prefixed[$this->conf('create')] = $this->DataLayer->datetime(time());
@@ -939,17 +926,13 @@ class SQL extends \artnum\JStore\OP {
     if ($id === null) { return -1; }
     $ownerField = $this->conf('owner');
     if ($ownerField) {
-      try {
-        $db = $this->get_db(true);
-        $stmt = $db->prepare(sprintf('SELECT %s FROM %s WHERE %s = :id', $ownerField, $this->conf('Table'), $this->conf('IDName')));
-        $stmt->bindValue(':id', $id, \PDO::PARAM_INT);
-        $stmt->execute();
-        $row = $stmt->fetch(\PDO::FETCH_NUM);
-        if (!$row) { throw new Exception('null'); }
-        return $row[0];
-      } catch (Exception $e) {
-        return null;
-      }
+      $db = $this->get_db(true);
+      $stmt = $db->prepare(sprintf('SELECT %s FROM %s WHERE %s = :id', $ownerField, $this->conf('Table'), $this->conf('IDName')));
+      $stmt->bindValue(':id', $id, \PDO::PARAM_INT);
+      $stmt->execute();
+      $row = $stmt->fetch(\PDO::FETCH_NUM);
+      if (!$row) { return -1; }
+      return $row[0];
     }
     return -1;
   }

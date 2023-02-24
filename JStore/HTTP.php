@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2017 - 2022 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2017 - 2023 Etienne Bagnoud <etienne@artisan-numerique.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,6 +30,8 @@ use \Exception;
 class HTTP extends \artnum\HTTP\CORS
 {
   protected $Model;
+  protected $response;
+  protected $etag = null;
 
   function __construct($model, $response) {
     parent::__construct();
@@ -37,15 +39,19 @@ class HTTP extends \artnum\HTTP\CORS
     $this->response = $response;
   }
 
+  function setETag ($etag) {
+    $this->etag = $etag;
+  }
+
   function optionsAction() {
     $this->response->clear_output();
-    parent::optionsAction();
     $this->response->start_output();
-    $body = ['options' => []];
+    $body = ['idname' => $this->Model->getIDName(), 'options' => []];
     if (method_exists($this->Model, 'getOptions')) {
       $body['options'] = $this->Model->getOptions();
     }
     $this->response->print($body);
+    parent::optionsAction();
     $this->response->stop_output();
     return ['count' => 0];
   }

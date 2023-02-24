@@ -4,6 +4,7 @@ Namespace artnum\HTTP;
 class CORS
 {
    protected $options;
+   protected $response = null;
 
    function __construct($options = [
       'max-age' => 3600,
@@ -67,5 +68,8 @@ class CORS
 
    function optionsAction () {
       $this->setCorsHeaders();
+      if ($this->response) {
+         $this->response->stop_output();
+      }
    }
 }

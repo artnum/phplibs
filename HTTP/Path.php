@@ -1,6 +1,6 @@
 <?PHP
 /*- 
- * Copyright (c) 2018 Etienne Bagnoud <etienne@artisan-numerique.ch>
+ * Copyright (c) 2018 - 2023 Etienne Bagnoud <etienne@artisan-numerique.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,13 +31,17 @@ class Path {
 
    function __construct() {
       $this->url_elements = array();
-
+      $this->url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
       $url_elements = explode('/', $_SERVER['PATH_INFO']);
       foreach($url_elements as $e) {
          if(!empty($e)) {
             $this->url_elements[] = $e;
          }
       } 
+   }
+
+   function getUrl() {
+      return $this->url;
    }
 }
 ?>

@@ -19,8 +19,8 @@ class SQLAudit {
 
     function req () {
         $stmt = $this->pdo->prepare('
-            INSERT INTO audit (userid, time, action, collection, item, body)
-            VALUES (:userid, :time, :action, :collection, :item, :body)');
+            INSERT INTO audit (userid, time, action, url, collection, item, body)
+            VALUES (:userid, :time, :action, :url, :collection, :item, :body)');
         $stmt->bindValue(':time', time(), PDO::PARAM_INT);
         return $stmt;
     }
@@ -30,7 +30,6 @@ class SQLAudit {
             if (!$response->succeed() && !$this->log_fail) { return; }
             $item = $response->getItemId();
             if ($item === -1) { $item = $request->getItem(); }
-
             switch ($request->getVerb()) {
                 case 'OPTIONS':
                 case 'HEAD':
@@ -107,6 +106,7 @@ class SQLAudit {
             } else {
                 $stmt->bindValue(':body', 'NULL', PDO::PARAM_NULL);
             }
+            $stmt->bindValue(':url', $request->getUrl(), PDO::PARAM_STR);
             $stmt->execute();
         } catch (Exception $e) {
             error_log(sprintf('%s (%d) [%s:%d]', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));

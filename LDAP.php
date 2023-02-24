@@ -65,7 +65,7 @@ class LDAP extends \artnum\JStore\OP {
   
   function getOptions() {
     $options = [];
-    if (is_callable($this, 'restore')) { $options[] = 'restore'; }
+    if (method_exists($this, 'restore')) { $options[] = 'restore'; }
     return $options;
   }
 
