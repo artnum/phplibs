@@ -1,6 +1,6 @@
-<?PHP
+<?php
 /*- 
-* Copyright (c) 2018 Etienne Bagnoud <etienne@artisan-numerique.ch>
+* Copyright (c) 2022 Etienne Bagnoud <etienne@artisan-numerique.ch>
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -24,92 +24,277 @@
 * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 * SUCH DAMAGE.
 */
-Namespace artnum\JStore;
+namespace artnum\JStore;
+
+use PDO;
+use Exception;
 
 class Auth {
-   function __construct($session, $user) {
-      $this->Session = $session;
-      $this->UserInterface = $user;
-      $this->Random = new \artnum\Random();
-      $this->Crypto = new \artnum\Crypto('sha256');
-   }
+    protected $pdo;
+    protected $table;
 
-   function getName() {
-      return 'Artnum.GenericAuth';
-   }
+    function __construct(PDO $pdo, String $table = 'jstore_auth') {
+        $this->pdo = $pdo;
+        $this->table = $table;
+        $this->timeout = 86400; // 24h
+        $this->current_userid = -1;
+    }
 
-   function handle($request) {
-      switch($request->getVerb()) {
-         case 'GET':
-            return $this->state($request);
-         case 'POST':
-            return $this->authenticate($request);
-         case 'PATCH':
-            return $this->update($request);
-      }
+    function get_current_userid() {
+        return $this->current_userid;
+    }
 
-      return false;
-   }
+    function generate_auth ($userid, $hpw) {
+        $sign = bin2hex(random_bytes(32));
+        $authvalue=  bin2hex(hash_hmac('sha256', $sign, $hpw, true));
+        if ($this->add_auth($userid, $authvalue)) {
+            return $sign;
+        }
+        return '';
+    }
 
-   function verify($request) {
-      return true;
-   }
+    function confirm_auth ($authvalue) {
+        $pdo = $this->pdo;
+        $done = false;
+        try {
+            $stmt = $pdo->prepare(sprintf('UPDATE %s SET "time" = :time, "confirmed" = 1 WHERE auth = :auth', $this->table));
+            $stmt->bindValue(':auth', $authvalue, PDO::PARAM_STR);
+            $stmt->bindValue(':time', time(), PDO::PARAM_INT);
 
-   function authorize($request) {
-      /* todo autorization part */
-      return $this->Session->get('auth-valid');
-   }
-
-   /* set password */
-   function update($request) {
-      return array('auth-success' => true);
-   }
-
-   function authenticate($request) {
-      if (! $request->getParameter('response')) {
-         $challenge = $this->Random->str(128);
-         if (!$challenge) {
-            return -1;
-         }
-         $this->Session->set('auth-challenge', $challenge);
-
-         $sleep = $this->UserInterface->fail('get', $request->getItem());
-         usleep(10000 * $sleep);
-
-         $_key = $this->UserInterface->getkey($request->getItem());
-         $ret =  array('challenge' => $challenge, 'salt' => $this->Random->str(32), 'iteration' => 1000);
-         if (!is_null($_key)) {
-            if (isset($_key['salt'])) {
-               $ret['salt'] = $_key['salt'];
+            $done = $stmt->execute();
+        } catch(Exception $e) {
+            error_log(sprintf('kaal-auth <confirm-auth>, "%s"', $e->getMessage()));
+        } finally {
+            if ($done) {
+                return $this->check_auth($authvalue);
             }
-            if (isset($_key['iteration'])) {
-               $ret['iteration'] = $_key['iteration'];
+            return $done;
+        }
+    }
+
+    function add_auth ($userid, $authvalue) {
+        $pdo = $this->pdo;
+        $done = false;
+        $ip = $_SERVER['REMOTE_ADDR'];
+        $host = empty($_SERVER['REMOTE_HOST']) ? $ip : $_SERVER['REMOTE_HOST'];
+        $ua = !empty($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+        
+        try {
+            $stmt = $pdo->prepare(sprintf('INSERT INTO %s (userid, auth, started, remotehost, remoteip, useragent) VALUES (:uid, :auth, :started, :remotehost, :remoteip, :useragent);', $this->table));
+            $stmt->bindValue(':uid', $userid, PDO::PARAM_STR);
+            $stmt->bindValue(':auth', $authvalue, PDO::PARAM_STR);
+            $stmt->bindValue(':started', time(), PDO::PARAM_INT);
+            $stmt->bindValue(':remotehost', $host, PDO::PARAM_STR);
+            $stmt->bindValue(':remoteip', $ip, PDO::PARAM_STR);
+            $stmt->bindValue(':useragent', $ua, PDO::PARAM_STR);
+
+            $done = $stmt->execute();
+        } catch (Exception $e) {
+            error_log(sprintf('kaal-auth <add-auth>, "%s"', $e->getMessage()));
+        } finally {
+            return $done;
+        }
+    }
+
+    function del_auth ($authvalue) {
+        $pdo = $this->pdo;
+        try {
+            $stmt = $pdo->prepare(sprintf('DELETE FROM %s WHERE auth = :auth', $this->table));
+            $stmt->bindValue(':auth', $authvalue, PDO::PARAM_STR);
+            $stmt->execute();
+        } catch(Exception $e) {
+            error_log(sprintf('kaal-auth <del-auth>, "%s"', $e->getMessage()));
+        } finally {
+            return true;
+        }
+    }
+
+    function check_auth ($authvalue) {
+        $pdo = $this->pdo;
+        $matching = false;
+        try {
+            $stmt = $pdo->prepare(sprintf('SELECT * FROM %s WHERE auth = :auth', $this->table));
+            $stmt->bindValue(':auth', $authvalue, PDO::PARAM_STR);
+            $stmt->execute();
+            while (($row = $stmt->fetch(PDO::FETCH_ASSOC))) {
+                if (time() - intVal($row['time'], 10) > $this->timeout) {
+                    $del = $pdo->prepare(sprintf('DELETE FROM %s WHERE auth = :auth', $this->table));
+                    $del->bindValue(':auth', $row['auth'], PDO::PARAM_STR);
+                    $del->execute();
+                } else {
+                    $matching = true;
+                    $this->current_userid = $row['userid'];
+                    break;
+                }
             }
-         }
-         return $ret;
-      } else {
-         /* second pass */
-         $key = $this->Random->str(256);
-         $_key = $this->UserInterface->getkey($request->getItem());
-         if (!is_null($_key)) {
-            $key = $_key;
-         }
-         
-         if ($this->Crypto->compare($this->Crypto->hmac($this->Session->get('auth-challenge'), $key['key']), $request->getParameter('response'))) {
-            $this->UserInterface->fail('reset', $request->getItem());
-            $this->Session->set('auth-valid', true);
-            return array('auth-success' => true);
-         } else {
-            $this->UserInterface->fail('inc', $request->getItem());
-            $this->Session->set('auth-valid', false);
-            return array('auth-success' => false);
-         }
-      }
+        } catch(Exception $e) {
+            error_log(sprintf('kaal-auth <check-auth>, "%s"', $e->getMessage()));
+        } finally {
+            return $matching;
+        }
+    }
+
+    function refresh_auth($authvalue) {
+        $pdo = $this->pdo;
+        $done = false;
+        $ip = $_SERVER['REMOTE_ADDR'];
+        $host = empty($_SERVER['REMOTE_HOST']) ? $ip : $_SERVER['REMOTE_HOST'];
+        try {
+            $stmt = $pdo->prepare(sprintf('UPDATE %s SET time = :time, remotehost = :remotehost, remoteip = :remoteip WHERE auth = :auth', $this->table));
+            $stmt->bindValue(':time', time(), PDO::PARAM_INT);
+            $stmt->bindValue(':auth', $authvalue, PDO::PARAM_STR);
+            $stmt->bindValue(':remotehost', $host, PDO::PARAM_STR);
+            $stmt->bindValue(':remoteip', $ip, PDO::PARAM_STR);
+
+            $done = $stmt->execute();
+        } catch (Exception $e) {
+            error_log(sprintf('kaal-auth <add-auth>, "%s"', $e->getMessage()));
+        } finally {
+            return $done;
+        }
+    }
+
+    function get_id ($authvalue) {
+        $pdo = $this->pdo;
+        $matching = false;
+        try {
+            $stmt = $pdo->prepare(sprintf('SELECT * FROM %s WHERE auth = :auth', $this->table));
+            $stmt->bindValue(':auth', $authvalue, PDO::PARAM_STR);
+            $stmt->execute();
+            while (($row = $stmt->fetch(PDO::FETCH_ASSOC))) {
+                if (time() - intVal($row['time'], 10) > $this->timeout) {
+                    $del = $pdo->prepare(sprintf('DELETE FROM %s WHERE auth = :auth', $this->table));
+                    $del->bindValue(':auth', $row['auth'], PDO::PARAM_STR);
+                    $del->execute();
+                } else {
+                    $matching = $row['userid'];
+                    break;
+                }
+            }
+        } catch(Exception $e) {
+            error_log(sprintf('kaal-auth <get-id>, "%s"', $e->getMessage()));
+        } finally {
+            return $matching;
+        }
+    }
+
+    function get_auth_token () {
+        try {
+            $authContent = explode(' ', $_SERVER['HTTP_AUTHORIZATION']);
+            if (count($authContent) !== 2) { throw new Exception('Wrong auth header'); }
+            if ($authContent[0] !== 'Bearer') { throw new Exception('Wrong auth header'); }
+            return $authContent[1];
+        } catch (Exception $e) {
+            error_log(sprintf('kaal-auth <get-id>, "%s"', $e->getMessage()));
+        }
+    }
+
+    function get_active_connection ($userid) {
+        $pdo = $this->pdo;
+        $connections = [];
+        try {
+            $stmt = $pdo->prepare(sprintf('SELECT * FROM %s WHERE userid = :userid', $this->table));
+            $stmt->bindValue(':userid', $userid, PDO::PARAM_INT);
+            $stmt->execute();
+            while (($row = $stmt->fetch(PDO::FETCH_ASSOC))) {
+                if (time() - intVal($row['time'], 10) > $this->timeout) {
+                    $del = $pdo->prepare(sprintf('DELETE FROM %s WHERE auth = :auth', $this->table));
+                    $del->bindValue(':auth', $row['auth'], PDO::PARAM_STR);
+                    $del->execute();
+                } else {
+                   $connections[] = [
+                    'uid' => $row['uid'],
+                    'time' => $row['time'],
+                    'useragent' => $row['useragent'],
+                    'remoteip' => $row['remoteip'],
+                    'remotehost' => $row['remotehost']
+                   ];
+                }
+            }
+        } catch(Exception $e) {
+            error_log(sprintf('kaal-auth <get-active-connection>, "%s"', $e->getMessage()));
+        } finally {
+            return $connections;
+        }
+    }
+
+    function del_specific_connection ($connectionid) {
+      // todo
    }
 
-   function state($request) {
-      return array('auth-success' => $this->Session->get('auth-valid'));
-   }
+    function del_all_connections ($userid) {
+        $pdo = $this->pdo;
+        try {
+            $stmt = $pdo->prepare(sprintf('DELETE FROM %s WHERE userid = :userid', $this->table));
+            $stmt->bindValue(':userid', $userid, PDO::PARAM_INT);
+            return $stmt->execute();
+        } catch(Exception $e) {
+            error_log(sprintf('kaal-auth <del-all-connections>, "%s"', $e->getMessage()));
+        } 
+    }
+
+    function verify () {
+        try {
+            $token = $this->get_auth_token();
+            return $this->check_auth($token);
+        } catch(Exception $e) {
+            error_log(sprintf('kaal-auth <verify>, "%s"', $e->getMessage()));
+            return false;
+        }
+    }
+
+    function run (User $user, $step, $content) {
+      try {
+         header('Content-Type: application/json', true);
+         switch ($step) {
+            default: throw new Exception('Unknown step');
+            case 'init':
+                  if(empty($content['userid'])) { throw new Exception(); }
+                  $u = $user->get($content['userid']);
+             
+                  $auth = $this->generate_auth($u['id'], $u['key']);
+                  if (empty($auth)) { throw new Exception(); }
+                  echo json_encode([
+                     'auth' => $auth,
+                     'count' => intval($u['key_iteration']),
+                     'salt' => $u['key_salt'],
+                     'userid' => intval($u['id'])
+                  ]);
+                  break;
+            case 'check':
+                  if (empty($content['auth'])) { throw new Exception(); }
+                  if (!$this->confirm_auth($content['auth'])) { throw new Exception(); }
+                  $this->refresh_auth($content['auth']);
+                  echo json_encode(['done' => true]);
+                  break;
+            case 'quit':
+                  if (empty($content['auth'])) { throw new Exception(); }
+                  if (!$this->del_auth($content['auth'])) { throw new Exception(); }
+                  echo json_encode(['done' => true]);
+                  break;
+            case 'userid':
+                  if (empty($content['username'])) { throw new Exception(); }
+                  $u = $user->getByUsername($content['username']);
+                  if (empty($u['id'])) { throw new Exception(); }
+                  echo json_encode(['userid' => intval($u['id'])]);
+                  break;
+            case 'disconnect':
+                  $token = $this->get_auth_token();
+                  if (!$this->check_auth($token)) { throw new Exception(); }
+                  $userid = $this->get_id($token);
+                  if (empty($content['userid'])) { throw new Exception(); }
+                  if (intval($content['userid']) !== $userid)  { throw new Exception(); }
+                  if (!$this->del_all_connections($content['userid'])) { throw new Exception(); }
+                  echo json_encode(['userid' => intval($content['userid'])]);
+                  break;
+         }
+      } catch (Exception $e) {
+         $msg = $e->getMessage();
+         error_log(var_export($e, true));
+         if (empty($msg)) { $msg = 'Wrong parameter'; }
+         echo json_encode(['error' => $msg]);
+         exit(0);
+
+      }
+    }
 }
-
-?>
