@@ -29,7 +29,8 @@ Namespace artnum\JStore;
 abstract class OP {
    protected $Config;
    protected $operation;
-
+   protected $response;
+   
    function __construct($config) {
       $this->operation = ['', ''];
       $this->Config = $config;

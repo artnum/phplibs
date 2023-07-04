@@ -268,7 +268,6 @@ class Generic {
             if (empty($etag)){ 
               $etag = $this->etag->set($this->request->getUrl());
             }
-            error_log('ETAG ' . $etag );
             $response->header('ETag', '"' . $etag . '"');
             break;
         }

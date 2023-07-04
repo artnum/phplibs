@@ -43,7 +43,6 @@ class ETag {
         $url = implode('.', $host);
         if (isset($parsed['path']) && $parsed['path'] !== null) {  $url .= str_replace('//', '/', $parsed['path']); }
         if (isset($parsed['query']) && $parsed['query'] !== null ) { $url .= $this->geturlquery($parsed['query']); }
-        error_log($url);
         return sha1(str_replace('//', '/', $url), true);
     }
 

@@ -559,9 +559,16 @@ class SQL extends \artnum\JStore\OP {
     return $whereClause;
   }
 
-  function prepareLimit($limit) {
+  function prepareLimit($limit, $sorted = false) {
     if(ctype_digit($limit)) {
-      return ' LIMIT ' . $limit;
+      $base = '';
+      /* by default, if we limit only, we sort the last X items and not the
+       * first X as it is most used during autocompletion
+       */
+      if (!$sorted) {
+        $base = ' ORDER BY "' . $this->IDName . '" DESC';
+      }
+      return $base . ' LIMIT ' . $limit;
     } else {
       list($offset, $limit) = explode(',', $limit);
       $offset = trim($offset); $limit = trim($limit);
@@ -593,13 +600,14 @@ class SQL extends \artnum\JStore\OP {
     if(! empty($options['search']) || !empty($options['s'])) {
       $statement .= ' ' . $this->prepareSearch(empty($options['search']) ? $options['s'] : $options['search']);
     }
-
+    $sorted = false;
     if(! empty($options['sort'])) {
+      $sorted = true;
       $statement .= ' ' . $this->prepareSort($options['sort']);
     }
     
     if(! empty($options['limit'])) {
-      $statement .= ' ' . $this->prepareLimit($options['limit']);
+      $statement .= ' ' . $this->prepareLimit($options['limit'], $sorted);
     }
     return $statement;
   }
