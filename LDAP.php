@@ -598,8 +598,7 @@ class LDAP extends \artnum\JStore\OP {
       $dn = ldap_get_dn($conn, $entry);
       $mods = array();
       $entryVal = array();
-      $ber = null;
-      for ($attr = ldap_first_attribute($conn, $entry, $ber); $attr; $attr = ldap_next_attribute($conn, $entry, $ber)) {
+      for ($attr = ldap_first_attribute($conn, $entry); $attr; $attr = ldap_next_attribute($conn, $entry)) {
         $attr = strtolower($attr);
         /* request for delete of attribute */
         if (isset($data['-' . $attr])) {
