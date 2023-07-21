@@ -34,6 +34,8 @@ class LDAP extends \artnum\JStore\OP {
   protected $Attribute;
   protected $attributeFilteringActive;
   protected $filterAttributes;
+  protected $response;
+  protected $Binary;
 
   function __construct($db, $base = NULL, $attributes = NULL, $config = NULL) {
     $this->DB = $db;
@@ -650,13 +652,16 @@ class LDAP extends \artnum\JStore\OP {
         switch ($mod['modtype']) {
           case LDAP_MODIFY_BATCH_REMOVE_ALL:
             $r = ldap_mod_del($conn, $dn, [$mod['attrib'] => []]);
-            $modResults[] = [$mod['attrib'] => $r, 'op' => 'remove']; break;
+            $modResults[] = [$mod['attrib'] => $r, 'op' => 'remove'];
+            break;
           case LDAP_MODIFY_BATCH_ADD:
             $r = @ldap_mod_add($conn, $dn, array($mod['attrib'] => $mod['values']));
-            $modResults[] = [$mod['attrib'] => $r, 'op' => 'add']; break;
+            $modResults[] = [$mod['attrib'] => $r, 'op' => 'add'];
+            break;
           case LDAP_MODIFY_BATCH_REPLACE:
             $r = @ldap_mod_replace($conn, $dn, array($mod['attrib'] => $mod['values']));
-            $modResults[] = [$mod['attrib'] => $r, 'op' => 'modify']; break;
+            $modResults[] = [$mod['attrib'] => $r, 'op' => 'modify'];
+            break;
         }
         if ($r === false) { $fullSuccess = false; }
       }
@@ -674,6 +679,8 @@ class LDAP extends \artnum\JStore\OP {
         $entry = ['objectclass' => $this->conf('objectclass'), $this->conf('rdnAttr') => array($rdnVal)];
       }
       foreach ($data as $k => $v) {
+        /* attribute starting with - are to be removed, so not included */
+        if (strpos($k, '-') === 0) { continue; }
         switch ($k) {
           case 'dn':
           case 'IDent': break;
