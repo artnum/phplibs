@@ -99,8 +99,8 @@ abstract class OP {
       return $this->_delete($arg);
    }
 
-   function read($arg) {
-      return $this->_read($arg);
+   function read($arg, $options = null) {
+      return $this->_read($arg, $options);
    }
    function exists($arg) {
       return $this->_exists($arg);

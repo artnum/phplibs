@@ -127,7 +127,7 @@ class HTTP extends \artnum\HTTP\CORS
       }
     }
 
-    return $this->Model->read($req->getItem());      
+    return $this->Model->read($req->getItem(), $req->getParameters());      
   }
 
   function patchAction ($req) {

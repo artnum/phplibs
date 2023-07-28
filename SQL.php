@@ -735,7 +735,7 @@ class SQL extends \artnum\JStore\OP {
     return $result;
   }
 
-  function _read($id) {
+  function _read($id, $options = null) {
     return $this->listing(['search' => array(str_replace($this->Table . '_', '', $this->IDName) => $id)]);
   }
 

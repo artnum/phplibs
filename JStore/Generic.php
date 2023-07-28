@@ -303,7 +303,7 @@ class Generic {
       }
 
       $this->postprocess();
-    } catch(\Exception $e) {
+    } catch(Exception $e) {
       error_log($e->getMessage());
       $this->fail($response, $e->getMessage());
     } finally {

@@ -141,7 +141,7 @@ class LDAP extends \artnum\JStore\OP {
     return NULL;
   }
 
-  function _read($dn) {
+  function _read($dn, $options = null) {
     $c = $this->DB->readable();
     $dn = rawurldecode($dn);
     $this->response->setItemId($dn);
