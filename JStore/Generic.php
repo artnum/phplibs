@@ -276,10 +276,11 @@ class Generic {
       $response->echo('{"data":[');
       $results = $this->controller->$action($this->request);
       $response->echo(
-        sprintf('],"success":true,"type":"results","store":"%s","idname":"%s","message":"OK","length":%d}',
+        sprintf('],"success":true,"type":"results","store":"%s","idname":"%s","message":"OK","length":%d, "softErrors":%s}',
           $this->request->getCollection(),
           $this->model->getIDName(),
-          $results['count'])
+          $results['count'],
+          json_encode($response->getSoftErrors()))
       );
       $response->stop_output();
 

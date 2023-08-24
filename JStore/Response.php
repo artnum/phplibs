@@ -36,6 +36,7 @@ class Response {
   protected $headerSent;
   protected $closed;
   protected $error;
+  protected $softErrors;
   protected $itemId;
 
   function __construct() {
@@ -48,6 +49,7 @@ class Response {
     $this->headerSent = false;
     $this->closed = false;
     $this->error = false;
+    $this->softErrors = [];
     $this->itemId = -1;
   }
 
@@ -143,6 +145,35 @@ class Response {
         'length' => 0
       ]
     );
+  }
+
+  /**
+   * Soft error is an error that apply to external sources, the software is
+   * working but its external connection might not work and would need to have
+   * user to do an operation manually to fix the issue.
+   */
+  function softError ($service, $message, $code = 500) {
+    $str = $message;
+    if ($message instanceof Exception) {
+      $str = $message->getMessage();
+      $prev = $message->getPrevious();
+      if ($prev) {
+        if ($prev instanceof Exception) {
+          $str = ' [cause: ' . $prev->getMessage() . ']';
+        } else {
+          $str = ' [cause: ' . $prev . ']';
+        }
+      }
+    }
+    $this->softErrors[] = [
+      'service' => $service,
+      'message' => $str,
+      'code' => $code
+    ];
+  }
+
+  function getSoftErrors () {
+    return $this->softErrors;
   }
 
   function header($name, $value, $replace = true) {
