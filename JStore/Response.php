@@ -36,6 +36,7 @@ class Response {
   protected $headerSent;
   protected $closed;
   protected $error;
+  protected $debug;
   protected $softErrors;
   protected $itemId;
 
@@ -50,6 +51,7 @@ class Response {
     $this->closed = false;
     $this->error = false;
     $this->softErrors = [];
+    $this->debug = [];
     $this->itemId = -1;
   }
 
@@ -174,6 +176,21 @@ class Response {
 
   function getSoftErrors () {
     return $this->softErrors;
+  }
+
+  function debug ($whatever) {
+    $debug = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, 5);
+    if (!is_scalar($whatever)) {
+      $whatever = var_export($whatever, true);
+    }
+    $this->debug[] = [
+      'stack' => $debug,
+      'message' => $whatever
+    ];
+  }
+
+  function printDebug () {
+    return json_encode($this->debug);
   }
 
   function header($name, $value, $replace = true) {

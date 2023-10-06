@@ -31,6 +31,7 @@ use Exception;
 class Generic { 
   public $db;
   public $request;
+  protected $conf;
   protected $dbs;
   protected $signature;
   protected $lockManager;
@@ -211,6 +212,8 @@ class Generic {
 
 
   function init($conf = null) {
+    $this->conf = $conf;
+    if ($conf->get('debug')) { error_log('Start request ' . (empty($_SERVER['HTTPS']) ? 'http' : 'https') . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"); }
     /* run user code */
     if(!ctype_alpha($this->request->getCollection())) {
       $this->fail($this->response, 'Collection not valid');
@@ -256,31 +259,36 @@ class Generic {
       } else {
         $response->header('Cache-Control', 'no-store, max-age=0');
       }
-      
       $response->header('Content-Type', 'application/json');
-      $action = strtolower($this->request->getVerb()) . 'Action';
-      if ($this->etag) {
-        switch ($action) {
-          case 'headAction':
-          case 'getAction':
-            if ($this->request->onItem() && strpos($this->request->getItem(), '.') === 0) { break; }
-            $etag = $this->etag->get($this->request->getUrl());
-            if (empty($etag)){ 
-              $etag = $this->etag->set($this->request->getUrl());
-            }
-            $response->header('ETag', '"' . $etag . '"');
-            break;
-        }
-      }
 
-      $response->echo('{"data":[');
-      $results = $this->controller->$action($this->request);
+      if ($this->request->onItem() && method_exists($this->model, $this->request->getItem())) {
+        $action = $this->request->getItem();
+        $response->echo('{"data":[');
+        $results = $this->model->$action($this->request);
+      } else {
+        $action = strtolower($this->request->getVerb()) . 'Action';
+        if ($this->etag) {
+          switch ($action) {
+            case 'headAction':
+            case 'getAction':
+              $etag = $this->etag->get($this->request->getUrl());
+              if (empty($etag)){ 
+                $etag = $this->etag->set($this->request->getUrl());
+              }
+              $response->header('ETag', '"' . $etag . '"');
+              break;
+          }
+        }
+        $response->echo('{"data":[');
+        $results = $this->controller->$action($this->request);
+      }
       $response->echo(
-        sprintf('],"success":true,"type":"results","store":"%s","idname":"%s","message":"OK","length":%d, "softErrors":%s}',
+        sprintf('],"success":true,"type":"results","store":"%s","idname":"%s","message":"OK","length":%d, "softErrors":%s%s}',
           $this->request->getCollection(),
           $this->model->getIDName(),
           $results['count'],
-          json_encode($response->getSoftErrors()))
+          json_encode($response->getSoftErrors()),
+          $this->conf->get('debug') ? ',"debug":' . $response->printDebug() : '')
       );
       $response->stop_output();
 
@@ -307,9 +315,9 @@ class Generic {
     } catch(Exception $e) {
       error_log($e->getMessage());
       $this->fail($response, $e->getMessage());
-    } finally {
-      return [$this->request, $response];
-    }
+    } 
+    if ($this->conf->get('debug')) { error_log('Request done'); }
+    return [$this->request, $response];
   }
 
   function fail($response, $message, $code = 500) {
