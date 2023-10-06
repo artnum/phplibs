@@ -6,6 +6,7 @@ use \artnum\HTTP\JsonRequest;
 use Exception;
 
 class SQLAudit {
+    protected $pdo;
     protected $log_fail;
     protected $log_read;
     protected $log_body;
@@ -23,6 +24,48 @@ class SQLAudit {
             VALUES (:userid, :time, :action, :url, :collection, :item, :body)');
         $stmt->bindValue(':time', time(), PDO::PARAM_INT);
         return $stmt;
+    }
+
+    function get_item_action (string $action, string $collection, string $item) {
+        try {
+            $stmt = $this->pdo->prepare('
+                SELECT userid, time, action, url, collection, item
+                FROM audit
+                WHERE action = :action AND collection = :collection AND item = :item
+                ORDER BY time DESC
+                LIMIT 1');
+            $stmt->bindValue(':action', $action, PDO::PARAM_STR);
+            $stmt->bindValue(':collection', $collection, PDO::PARAM_STR);
+            $stmt->bindValue(':item', $item, PDO::PARAM_STR);
+            if (!$stmt->execute()) {
+                return false;
+            }
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log(sprintf('%s (%d) [%s:%d]', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));
+        }
+    }
+
+    function new_action (
+            string $action,
+            string $collection,
+            string $item,
+            mixed $userid,
+            string $url = '',
+            string $body = ''
+        ) {
+        try {
+            $stmt = $this->req();
+            $stmt->bindValue(':collection', $collection, PDO::PARAM_STR);
+            $stmt->bindValue(':item', strval($item), PDO::PARAM_STR);
+            $stmt->bindValue(':userid', $userid);
+            $stmt->bindValue(':action', strtoupper($action), PDO::PARAM_STR);
+            $stmt->bindValue(':url', $url, PDO::PARAM_STR);
+            $stmt->bindValue(':body',$body, PDO::PARAM_STR);
+            return $stmt->execute();
+        } catch (Exception $e) {
+            error_log(sprintf('%s (%d) [%s:%d]', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));
+        }
     }
 
     function audit (JsonRequest $request, Response $response, $userid) {

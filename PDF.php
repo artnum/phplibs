@@ -11,7 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- *
+ *cd
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,8 +25,6 @@
  * SUCH DAMAGE.
  */
 namespace artnum;
-
-include('tfpdf/tfpdf.php');
 
 class PDF extends \tFPDF {
   protected $layers = array();
@@ -529,11 +527,11 @@ class PDF extends \tFPDF {
   }
 
   function setPtFontSize($pt) {
-  	$this->FontSizePt = $pt;
+    $this->FontSizePt = $pt;
     $this->FontSize = $pt / $this->k;
     $this->last_font_size = $this->FontSize;
-	  if($this->page>0) {
-		  $this->_out(sprintf('BT /F%d %.2F Tf ET',$this->CurrentFont['i'],$this->FontSizePt));
+    if($this->CurrentFont && $this->page>0) {
+      $this->_out(sprintf('BT /F%d %.2F Tf ET',$this->CurrentFont['i'],$this->FontSizePt));
     }
   }
 
