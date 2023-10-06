@@ -39,8 +39,8 @@ class Generic {
   protected $postprocessFunctions = [];
   protected $collection;
   protected $user = -1;
-  protected $model = null;
-  protected $controller = null;
+  protected $model;
+  protected $controller;
   protected $acl = null;
   protected $response;
   protected $etag = null;
@@ -132,47 +132,6 @@ class Generic {
     return NULL;
   }
 
-  /* Internal query */
-  private function internal ($response) {
-    switch(strtolower(substr($this->request->getCollection(), 1))) {
-      case 'lock':
-        if (! $this->lockManager) {
-          $this->fail($response, 'No lock manager');
-        }
-        if (! $this->request->onItem()) {
-          $this->fail($response, 'Lock must have an object to lock');
-        } else {
-          if (is_string($this->lockManager) && strcasecmp($this->lockManager, 'void') === 0) {
-            switch($this->request->getParameter('operation')) {
-              case 'lock':
-                $lock = array('state' => 'acquired', 'key' => '-', 'timeout' => 0, 'error' => false); break;
-              case 'unlock':
-                $lock = array('state' => 'unlocked', 'key' => '', 'tiemout' => 0, 'error' => false); break;
-              default:
-              case 'state':
-                $lock = array('state' => 'unlocked', 'key' => '', 'tiemout' => 0, 'error' => false); break;
-            }
-          } else {
-            if (strtolower($this->request->getVerb()) != 'post') {
-              $this->fail($response, 'Lock only have a POST inteface');
-            }
-            $lockOp = array('on' => $this->request->getItem(), 'operation' => '', 'key' => '');
-            foreach($lockOp as $k => $v) {
-              if ($this->request->hasParameter($k)) {
-                $lockOp[$k] = $this->request->getParameter($k);
-              }
-            }
-            $lock = $this->lockManager->request($lockOp);
-            if (!$lock) {
-              $this->fail($response, 'Lock module fail');
-            }
-          }
-          file_put_contents('php://output', json_encode($lock));
-        }
-        break;
-    }
-  }
-
   /* postprocess is here to allow to take supplementary action after the request
    * has been processed and output is done.
    * Return value is not taken into account
@@ -210,11 +169,32 @@ class Generic {
     $this->etag->set($url);
   }
 
+  function cacheHeaders () {
+    if (!method_exists($this->model, 'getCacheOpts')) {
+      $this->response->header('Cache-Control', 'no-store, max-age=0');
+      return;
+    }
+
+    $copts = $this->model->getCacheOpts();
+    if (!empty($copts['age']) && is_int($copts['age'])) {
+      $maxage = ', max-age=' . $copts['age'];
+      if ($copts['public']) {
+        $this->response->header('Cache-Control', 'public' . $maxage);
+        return;
+      }
+      $this->response->header('Cache-Control', 'private' . $maxage);
+      return;
+    }
+    $this->response->header('Cache-Control', 'no-store, max-age=0');
+  }
 
   function init($conf = null) {
     $this->conf = $conf;
-    if ($conf->get('debug')) { error_log('Start request ' . (empty($_SERVER['HTTPS']) ? 'http' : 'https') . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"); }
-    /* run user code */
+    if ($conf->get('debug')) { 
+      error_log('Start request ' . (empty($_SERVER['HTTPS']) ? 'http' : 'https') . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"); 
+    
+    }
+
     if(!ctype_alpha($this->request->getCollection())) {
       $this->fail($this->response, 'Collection not valid');
     }
@@ -233,32 +213,14 @@ class Generic {
   }
 
   function run() {
-    $response = $this->response;
-    if ($this->acl) {
-      $this->model->setAttributeFilter($this->acl->getCurrentAttributesFilter());
-    }
-
-    if (substr($this->request->getCollection(), 0, 1) == '.') {
-      $ret = $this->internal($response);
-      return $ret;
-    } 
-    
     try {
-      if (method_exists($this->model, 'getCacheOpts')) {
-        $copts = $this->model->getCacheOpts();
-        if (!empty($copts['age']) && is_int($copts['age'])) {
-          $maxage = ', max-age=' . $copts['age'];
-          if ($copts['public']) {
-            $response->header('Cache-Control', 'public' . $maxage);
-          } else {
-            $response->header('Cache-Control', 'private' . $maxage);
-          }
-        } else {
-          $response->header('Cache-Control', 'no-store, max-age=0');
-        }
-      } else {
-        $response->header('Cache-Control', 'no-store, max-age=0');
+      $response = $this->response;
+      if ($this->acl) {
+        $this->model->setAttributeFilter($this->acl->getCurrentAttributesFilter());
       }
+    
+ 
+      $this->cacheHeaders();
       $response->header('Content-Type', 'application/json');
 
       if ($this->request->onItem() && method_exists($this->model, $this->request->getItem())) {
@@ -282,9 +244,10 @@ class Generic {
         $response->echo('{"data":[');
         $results = $this->controller->$action($this->request);
       }
+
       $response->echo(
         sprintf('],"success":true,"type":"results","store":"%s","idname":"%s","message":"OK","length":%d, "softErrors":%s%s}',
-          $this->request->getCollection(),
+          $this->collection,
           $this->model->getIDName(),
           $results['count'],
           json_encode($response->getSoftErrors()),
