@@ -31,6 +31,9 @@ class ACL {
     const ANY = 2;
     const NONE = 0;
 
+    const WHO_IS_USER = -1;
+    const WHO_IS_EVERYONE = -255;
+
     const LEVEL_NONE = 0;
     const LEVEL_AUTH = 1;
     const LEVEL_SEARCH = 2;
@@ -41,10 +44,14 @@ class ACL {
     const LEVEL_IMPERSONATE = 2048;
     const LEVEL_ANY = 32768;
 
+    protected array $rules = [];
+    protected array $groups = [];
+    protected array $current_rule = [];
+
     function __construct($groups) {
         $this->rules = [];
         $this->groups = $groups;
-        $this->current_rule = ['collection' => '*', 'who' => -1, 'what' => self::LEVEL_NONE, 'isGroup' => true, 'access' => self::ANY, 'attributes' => ['*']];
+        //$this->current_rule = ['collection' => '*', 'who' => -1, 'what' => self::LEVEL_NONE, 'isGroup' => true, 'access' => self::ANY, 'attributes' => ['*']];
     }
 
     function getCurrentAttributesFilter () {
@@ -58,6 +65,24 @@ class ACL {
     }
 
     function matchRule ($rule, $collection, $who, $what) {
+        if ($who <= 0 && $rule['who'] != self::WHO_IS_EVERYONE) { return false; }
+        
+        if ($rule['who'] == self::WHO_IS_EVERYONE
+            && ($what <= $rule['what'])
+            && ($collection === $rule['collection'] || $rule['collection'] === '*')
+        ) {
+            return true;
+        }
+
+        if (
+            $who > 1 
+            && $rule['who'] == self::WHO_IS_USER
+            && ($what <= $rule['what'])
+            && ($collection === $rule['collection'] || $rule['collection'] === '*')
+        ) {
+            return true;
+        }
+
         if ($rule['isGroup']) {
             if (
                 $this->isMember($who, $rule['who']) && 
@@ -66,6 +91,7 @@ class ACL {
             ) 
                 { return true; }
         }
+        
         if (
             $rule['who'] === $who && 
             ($what <= $rule['what']) &&
