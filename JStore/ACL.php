@@ -31,6 +31,8 @@ class ACL {
     const ANY = 2;
     const NONE = 0;
 
+    const USER_ROOT = 0;
+
     const WHO_IS_USER = -1;
     const WHO_IS_EVERYONE = -255;
 
@@ -65,7 +67,11 @@ class ACL {
     }
 
     function matchRule ($rule, $collection, $who, $what) {
-        if ($who <= 0 && $rule['who'] != self::WHO_IS_EVERYONE) { return false; }
+        if ($who === ACL::USER_ROOT) { return true; }
+    
+        if ($who < ACL::USER_ROOT 
+            && $rule['who'] != self::WHO_IS_EVERYONE
+        ) { return false; }
         
         if ($rule['who'] == self::WHO_IS_EVERYONE
             && ($what <= $rule['what'])
@@ -75,7 +81,7 @@ class ACL {
         }
 
         if (
-            $who > 1 
+            $who > ACL::USER_ROOT
             && $rule['who'] == self::WHO_IS_USER
             && ($what <= $rule['what'])
             && ($collection === $rule['collection'] || $rule['collection'] === '*')
@@ -97,6 +103,7 @@ class ACL {
             ($what <= $rule['what']) &&
             ($collection === $rule['collection'] || $rule['collection'] === '*')
         ) { return true; }
+
         return false;
     }
 
