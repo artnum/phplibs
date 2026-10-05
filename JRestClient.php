@@ -233,6 +233,24 @@ class JRestClient {
       return $this->exec();
    }
 
+   function query ($body, $collection = NULL) {
+      $this->method = 'POST';
+      if (empty($body)) {
+         return $this->getCollection($collection);
+      }
+
+      $jdata = \json_encode($body);
+      $this->_init($this->_build_url(NULL, $collection) . '/_query');
+      \curl_setopt($this->ch, \CURLOPT_POST, TRUE);
+      \curl_setopt($this->ch, \CURLOPT_POSTFIELDS, $jdata);
+      $this->queryHeaders = [
+            'Content-Type' => 'application/json',
+            'Content-Length' => \strlen($jdata),
+            'Content-MD5' => \md5($jdata)
+         ];
+      return $this->exec();
+   }
+
    protected function _parse_header($header_txt) {
       $headers = \explode("\n", $header_txt);
       foreach($headers as $h) {
