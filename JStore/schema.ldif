@@ -1,0 +1,151 @@
+# {4}ldapab, schema, config
+dn: cn=ldapab,cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: ldapab
+olcObjectIdentifier: {0}cosmocodeOID 1.3.6.1.4.1.16331
+olcObjectIdentifier: {1}LDAPab cosmocodeOID:2.2
+olcAttributeTypes: {0}( 1.3.6.1.4.1.16331.2.2.1.1 NAME 'anniversary' DESC 'Hol
+ ds Marriage dates etc.' EQUALITY caseIgnoreMatch ORDERING caseIgnoreOrderingM
+ atch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SI
+ NGLE-VALUE )
+olcAttributeTypes: {1}( 1.3.6.1.4.1.16331.2.2.1.2 NAME 'marker' DESC 'For tagg
+ ing support' EQUALITY caseIgnoreMatch ORDERING caseIgnoreOrderingMatch SUBSTR
+  caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {2}( 1.3.6.1.4.1.16331.2.2.1.3 NAME 'birthday' DESC 'Date o
+ f birth' EQUALITY caseIgnoreMatch ORDERING caseIgnoreOrderingMatch SUBSTR cas
+ eIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
+olcAttributeTypes: {3}( 1.3.6.1.4.1.16331.2.2.1.51 NAME 'custom1' DESC 'Thunde
+ rbird compatible custom field 1' EQUALITY caseIgnoreMatch ORDERING caseIgnore
+ OrderingMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.12
+ 1.1.15{256} )
+olcAttributeTypes: {4}( 1.3.6.1.4.1.16331.2.2.1.52 NAME 'custom2' DESC 'Thunde
+ rbird compatible custom field 2' EQUALITY caseIgnoreMatch ORDERING caseIgnore
+ OrderingMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.12
+ 1.1.15{256} )
+olcAttributeTypes: {5}( 1.3.6.1.4.1.16331.2.2.1.53 NAME 'custom3' DESC 'Thunde
+ rbird compatible custom field 3' EQUALITY caseIgnoreMatch ORDERING caseIgnore
+ OrderingMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.12
+ 1.1.15{256} )
+olcAttributeTypes: {6}( 1.3.6.1.4.1.16331.2.2.1.54 NAME 'custom4' DESC 'Thunde
+ rbird compatible custom field 4' EQUALITY caseIgnoreMatch ORDERING caseIgnore
+ OrderingMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.12
+ 1.1.15{256} )
+olcObjectClasses: {0}( 1.3.6.1.4.1.16331.2.2.2.1 NAME 'contactPerson' DESC 'Co
+ ntact - Addressbook entry' AUXILIARY MAY ( anniversary $ marker $ birthday $ 
+ custom1 $ custom2 $ custom3 $ custom4 ) )
+
+# {5}iroadditionaluserinfo, schema, config
+dn: cn=iroadditionaluserinfo,cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: iroadditionaluserinfo
+olcAttributeTypes: {0}( 1.3.6.1.4.1.30890.1.2.1.0 NAME ( 'mozillaHomeState' 'i
+ roHomeState' ) DESC 'Name of a state for personnal address' SUP st SINGLE-VAL
+ UE )
+olcAttributeTypes: {1}( 1.3.6.1.4.1.30890.1.2.1.1 NAME ( 'mozillaHomeLocalityN
+ ame' 'iroHomeLocality' ) DESC 'Locality for home address' SUP l SINGLE-VALUE 
+ )
+olcAttributeTypes: {2}( 1.3.6.1.4.1.30890.1.2.1.2 NAME ( 'mozillaHomePostalCod
+ e' 'iroHomePostalCode' ) DESC 'Postal code for home address' SUP postalCode S
+ INGLE-VALUE )
+olcAttributeTypes: {3}( 1.3.6.1.4.1.30890.1.2.1.7 NAME ( 'mozillaHomeCountryNa
+ me' 'iroHomeCountryName' ) DESC 'Home (living) country name (mozilla interop)
+ ' SUP countryName SINGLE-VALUE )
+olcAttributeTypes: {4}( 1.3.6.1.4.1.30890.1.2.1.8 NAME ( 'mozillaUseHtmlMail' 
+ 'iroUseHtmlMail' ) DESC 'True if mail is to send HTML formatted (mozilla inte
+ rop)' EQUALITY booleanMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.7 SINGLE-VALUE 
+ )
+olcAttributeTypes: {5}( 1.3.6.1.4.1.30890.1.2.1.3 NAME 'iroBankAccount' DESC '
+ Personal bank account number (IBAN)' EQUALITY caseIgnoreMatch SUBSTR caseIgno
+ reSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
+olcAttributeTypes: {6}( 1.3.6.1.4.1.30890.1.2.1.4 NAME 'iroBankEstablishment' 
+ DESC 'Personnal user bank establishment' EQUALITY distinguishedNameMatch SYNT
+ AX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE )
+olcAttributeTypes: {7}( 1.3.6.1.4.1.30890.1.2.1.9 NAME 'iroBankPostalAccount' 
+ DESC 'Bank postal account, use in some country' EQUALITY caseIgnoreMatch SUBS
+ TR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALU
+ E )
+olcAttributeTypes: {8}( 1.3.6.1.4.1.30890.1.2.1.10 NAME 'iroBankSwift' DESC 'S
+ wift code (or aka BIC-code)' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstr
+ ingsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
+olcAttributeTypes: {9}( 1.3.6.1.4.1.30890.1.2.1.11 NAME 'iroBankClearing' DESC
+  'Bank clearing number' EQUALITY integerMatch SYNTAX 1.3.6.1.4.1.1466.115.121
+ .1.27 SINGLE-VALUE )
+olcAttributeTypes: {10}( 1.3.6.1.4.1.30890.1.2.2.5 NAME 'iroContractStartDate'
+  DESC 'Person contract start' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubst
+ ringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcAttributeTypes: {11}( 1.3.6.1.4.1.30890.1.2.2.6 NAME 'iroContractEndDate' D
+ ESC 'Person contract end' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstring
+ sMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcAttributeTypes: {12}( 1.3.6.1.4.1.30890.1.2.1.14 NAME 'primaryActivity' DES
+ C 'Primary business activity' SUP businessCategory )
+olcObjectClasses: {0}( 1.3.6.1.4.1.30890.1.2.2.0 NAME 'iroAdditionalUserInfo' 
+ DESC 'Additional useful user information, use to extend inetOrgPerson' SUP to
+ p AUXILIARY MAY ( iroHomeState $ iroHomeLocality $ iroHomePostalCode $ iroBan
+ kAccount $ iroBankEstablishment $ iroUseHtmlMail $ iroHomeCountryName $ count
+ ryName $ primaryActivity ) )
+olcObjectClasses: {1}( 1.3.6.1.4.1.30890.1.2.2.1 NAME 'iroContractPerson' DESC
+  'Additional contractual information' SUP top AUXILIARY MUST iroContractStart
+ Date MAY iroContractEndDate )
+olcObjectClasses: {2}( 1.3.6.1.4.1.30890.1.2.2.2 NAME 'iroBank' DESC 'Extended
+  information about bank' SUP top AUXILIARY MUST iroBankSwift MAY ( iroBankCle
+ aring $ iroBankPostalAccount ) )
+olcObjectClasses: {3}( 1.3.6.1.4.1.30890.1.2.2.3 NAME 'iroOrganizationExtended
+ ' DESC 'Extended information for organization' SUP top AUXILIARY MAY ( labele
+ dURI $ countryName $ mail $ uid $ primaryActivity ) )
+
+# {6}saddr, schema, config
+dn: cn=saddr,cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: saddr
+olcObjectIdentifier: {0}saddrRoot 1.3.6.1.4.1.31204.100.6
+olcObjectIdentifier: {1}saddrAttr saddrRoot:1.1
+olcObjectIdentifier: {2}saddrClass saddrRoot:1.2
+olcAttributeTypes: {0}( saddrAttr:1 NAME 'saddrConfigName' DESC 'Configuration
+  name' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6
+ .1.4.1.1466.115.121.1.15 )
+olcAttributeTypes: {1}( saddrAttr:2 NAME 'saddrBase' DESC 'Directory base for 
+ saddr' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+olcAttributeTypes: {2}( saddrAttr:3 NAME 'saddrModules' DESC 'Directory base f
+ or module configuration' SUP saddrBase )
+olcAttributeTypes: {3}( saddrAttr:4 NAME 'saddrDojoWebPath' DESC 'Absolute pat
+ h for Dojo' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 
+ 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
+olcAttributeTypes: {4}( saddrAttr:5 NAME 'saddrDijitThemeWebPath' DESC 'Absolu
+ te path for Dijit theme' SUP saddrDojoWebPath SINGLE-VALUE )
+olcAttributeTypes: {5}( saddrAttr:6 NAME 'saddrDijitThemeName' DESC 'Dijit the
+ me name' SUP saddrDojoWebPath SINGLE-VALUE )
+olcAttributeTypes: {6}( saddrAttr:7 NAME 'saddrModulePath' DESC 'Module includ
+ e file path' SUP saddrDojoWebPath SINGLE-VALUE )
+olcAttributeTypes: {7}( saddrAttr:8 NAME 'saddrModuleName' DESC 'Human-readabl
+ e module name' SUP saddrConfigName SINGLE-VALUE )
+olcAttributeTypes: {8}( saddrAttr:10 NAME 'addrParent' DESC 'Parent adresse (l
+ ike company, ...)' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.1466.11
+ 5.121.1.12 )
+olcAttributeTypes: {9}( saddrAttr:11 NAME 'addrRelation' DESC 'Relation with o
+ ther adresses (WORKAT dn STARTDATE ENDDATE)' EQUALITY caseIgnoreMatch SUBSTR 
+ caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcAttributeTypes: {10}( saddrAttr:9 NAME 'addrUsage' DESC 'Adress usage' EQUA
+ LITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466
+ .115.121.1.15 )
+olcAttributeTypes: {11}( saddrAttr:15 NAME 'addrImported' DESC 'Data used by i
+ mportation procedure' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMat
+ ch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcAttributeTypes: {12}( saddrAttr:12 NAME 'addrTaxNumber' DESC 'Tax number' E
+ QUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1
+ 466.115.121.1.15 )
+olcAttributeTypes: {13}( saddrAttr:13 NAME 'addrEntrepriseID' DESC 'Governemen
+ t entreprise id' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SY
+ NTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcAttributeTypes: {14}( saddrAttr:14 NAME 'addrSyncId' DESC 'ID Sync' EQUALIT
+ Y caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.11
+ 5.121.1.15 )
+olcObjectClasses: {0}( saddrClass:1 NAME 'saddrConfiguration' DESC 'Global sad
+ dr configuration' SUP top STRUCTURAL MUST ( saddrConfigName $ saddrBase ) MAY
+  ( saddrDojoWebPath $ saddrDijitThemeWebPath $ saddrDijitThemeName $ saddrMod
+ ules ) )
+olcObjectClasses: {1}( saddrClass:2 NAME 'saddrModuleConfiguration' DESC 'sadd
+ r modules configuration' SUP top STRUCTURAL MUST ( saddrConfigName $ saddrMod
+ ulePath ) MAY ( saddrBase $ saddrModuleName ) )
+olcObjectClasses: {2}( saddrClass:3 NAME 'addrExtension' DESC 'Extension for a
+ dresses' SUP top AUXILIARY MAY (addrUsage $ addrParent $ addrRelation $ addrT
+ axNumber $ addrEntrepriseID $ addrSyncId $ addrImported))
