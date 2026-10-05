@@ -170,6 +170,7 @@ class Generic {
   }
 
   function cacheHeaders () {
+    if (!$this->model) { return; }
     if (!method_exists($this->model, 'getCacheOpts')) {
       $this->response->header('Cache-Control', 'no-store, max-age=0');
       return;
@@ -192,7 +193,6 @@ class Generic {
     $this->conf = $conf;
     if ($conf->get('debug')) { 
       error_log('Start request ' . (empty($_SERVER['HTTPS']) ? 'http' : 'https') . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"); 
-    
     }
 
     if(!ctype_alpha($this->request->getCollection())) {
